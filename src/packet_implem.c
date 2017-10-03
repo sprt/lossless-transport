@@ -20,10 +20,6 @@ struct __attribute__((__packed__)) pkt {
 	uint32_t crc2;
 };
 
-bool pkt_has_payload(const pkt_t *pkt) {
-	return pkt->header->length > 0;
-}
-
 pkt_t* pkt_new() {
 	pkt_t *pkt = malloc(sizeof (pkt_t));
 	if (pkt == NULL) {
@@ -70,10 +66,15 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
 
 	size_t total = sizeof (*pkt->header);
-	if (pkt_has_payload(pkt)) {
+	if (pkt_get_length(pkt) > 0) {
 		total += length * sizeof (pkt->payload[0]);
 		total += sizeof (pkt->crc2);
 	}
+
+	fprintf(stderr, "pkt_encode:\n");
+	fprintf(stderr, "pkt_get_length: %d\n", length);
+	fprintf(stderr, "len: %zu\n", *len);
+	fprintf(stderr, "total: %zu\n\n", total);
 
 	if (total > *len) {
 		*len = 0;
@@ -85,7 +86,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + n, pkt->header, sizeof (*pkt->header));
 	n += sizeof (*pkt->header);
 
-	if (pkt_has_payload(pkt)) {
+	if (pkt_get_length(pkt) > 0) {
 		memcpy(buf + n, pkt->payload, length * sizeof (pkt->payload[0]));
 		n += length * sizeof (pkt->payload[0]);
 
@@ -96,6 +97,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	*len = n;
 	return PKT_OK;
 }
+
 
 /*
  * Getters
@@ -118,6 +120,9 @@ uint8_t pkt_get_seqnum(const pkt_t* pkt) {
 }
 
 uint16_t pkt_get_length(const pkt_t* pkt) {
+	if (pkt_get_tr(pkt)) {
+		return 0;
+	}
 	return ntohs(pkt->header->length);
 }
 
@@ -136,6 +141,7 @@ uint32_t pkt_get_crc2(const pkt_t* pkt) {
 const char* pkt_get_payload(const pkt_t* pkt) {
 	return pkt->payload;
 }
+
 
 /*
  * Setters
@@ -171,7 +177,7 @@ pkt_status_code pkt_set_seqnum(pkt_t *pkt, const uint8_t seqnum) {
 }
 
 pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length) {
-	fprintf(stderr, "pkt_set_length: %d\n", length);
+	fprintf(stderr, "pkt_set_length: %d\n\n", length);
 	if (length > MAX_PAYLOAD_SIZE) {
 		return E_LENGTH;
 	}
@@ -197,8 +203,8 @@ pkt_status_code pkt_set_crc2(pkt_t *pkt, const uint32_t crc2) {
 pkt_status_code pkt_set_payload(pkt_t *pkt,
                                 const char *data,
                                 const uint16_t length) {
-	fprintf(stderr, "length: %d\n", length);
-	fprintf(stderr, "pkt->header->length: %d\n", pkt->header->length);
+	fprintf(stderr, "pkt_set_payload:\n");
+	fprintf(stderr, "length: %d\n\n", length);
 
 	pkt_status_code code = pkt_set_length(pkt, length);
 	if (code != PKT_OK) {
@@ -209,7 +215,7 @@ pkt_status_code pkt_set_payload(pkt_t *pkt,
 	if (pkt->payload == NULL) {
 		return E_NOMEM;
 	}
-	memcpy(pkt->payload, data, length);
 
+	memcpy(pkt->payload, data, length);
 	return PKT_OK;
 }
