@@ -5,3 +5,6 @@ sender:
 	-pedantic-errors -Wshadow -Wduplicated-cond -Wduplicated-branches \
 	-Wlogical-op -Wrestrict -Wnull-dereference -Wformat=2 \
 	src/sender.c -o sender
+
+clean:
+	rm sender
