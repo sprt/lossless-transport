@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <netinet/in.h>
 #include "packet_interface.h"
 
@@ -18,6 +19,10 @@ struct __attribute__((__packed__)) pkt {
 	char *payload;
 	uint32_t crc2;
 };
+
+bool pkt_has_payload(const pkt_t *pkt) {
+	return pkt->header->length > 0;
+}
 
 pkt_t* pkt_new() {
 	pkt_t *pkt = malloc(sizeof (pkt_t));
@@ -65,7 +70,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
 
 	size_t total = sizeof (*pkt->header);
-	if (pkt->payload != NULL) {
+	if (pkt_has_payload(pkt)) {
 		total += length * sizeof (pkt->payload[0]);
 		total += sizeof (pkt->crc2);
 	}
@@ -80,7 +85,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + n, pkt->header, sizeof (*pkt->header));
 	n += sizeof (*pkt->header);
 
-	if (pkt->payload != NULL) {
+	if (pkt_has_payload(pkt)) {
 		memcpy(buf + n, pkt->payload, length * sizeof (pkt->payload[0]));
 		n += length * sizeof (pkt->payload[0]);
 
