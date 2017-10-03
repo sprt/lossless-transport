@@ -62,7 +62,7 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 }
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
-	uint16_t length = pkt->header->length;
+	uint16_t length = pkt_get_length(pkt);
 
 	size_t total = sizeof (*pkt->header);
 	if (pkt->payload != NULL) {
@@ -76,10 +76,6 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	}
 
 	size_t n = 0;
-
-	pkt->header->length = htons(pkt->header->length);
-	pkt->header->crc1 = htonl(pkt->header->crc1);
-	pkt->crc2 = htonl(pkt->crc2);
 
 	memcpy(buf + n, pkt->header, sizeof (*pkt->header));
 	n += sizeof (*pkt->header);
@@ -117,7 +113,7 @@ uint8_t pkt_get_seqnum(const pkt_t* pkt) {
 }
 
 uint16_t pkt_get_length(const pkt_t* pkt) {
-	return pkt->header->length;
+	return ntohs(pkt->header->length);
 }
 
 uint32_t pkt_get_timestamp(const pkt_t* pkt) {
@@ -125,11 +121,11 @@ uint32_t pkt_get_timestamp(const pkt_t* pkt) {
 }
 
 uint32_t pkt_get_crc1(const pkt_t* pkt) {
-	return pkt->header->crc1;
+	return ntohl(pkt->header->crc1);
 }
 
 uint32_t pkt_get_crc2(const pkt_t* pkt) {
-	return pkt->crc2;
+	return ntohl(pkt->crc2);
 }
 
 const char* pkt_get_payload(const pkt_t* pkt) {
@@ -174,7 +170,7 @@ pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length) {
 	if (length > MAX_PAYLOAD_SIZE) {
 		return E_LENGTH;
 	}
-	pkt->header->length = length;
+	pkt->header->length = htons(length);
 	return PKT_OK;
 }
 
@@ -184,12 +180,12 @@ pkt_status_code pkt_set_timestamp(pkt_t *pkt, const uint32_t timestamp) {
 }
 
 pkt_status_code pkt_set_crc1(pkt_t *pkt, const uint32_t crc1) {
-	pkt->header->crc1 = crc1;
+	pkt->header->crc1 = htonl(crc1);
 	return PKT_OK;
 }
 
 pkt_status_code pkt_set_crc2(pkt_t *pkt, const uint32_t crc2) {
-	pkt->crc2 = crc2;
+	pkt->crc2 = htonl(crc2);
 	return PKT_OK;
 }
 
