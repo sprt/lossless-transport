@@ -194,13 +194,17 @@ pkt_status_code pkt_set_payload(pkt_t *pkt,
                                 const uint16_t length) {
 	fprintf(stderr, "length: %d\n", length);
 	fprintf(stderr, "pkt->header->length: %d\n", pkt->header->length);
-	if (length != pkt->header->length) {
-		return E_UNCONSISTENT;
+
+	pkt_status_code code = pkt_set_length(pkt, length);
+	if (code != PKT_OK) {
+		return code;
 	}
+
 	pkt->payload = realloc(pkt->payload, length * sizeof (pkt->payload[0]));
 	if (pkt->payload == NULL) {
 		return E_NOMEM;
 	}
 	memcpy(pkt->payload, data, length);
+
 	return PKT_OK;
 }
