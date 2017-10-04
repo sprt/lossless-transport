@@ -66,7 +66,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
 
 	size_t total = sizeof (*pkt->header);
-	if (pkt_get_length(pkt) > 0) {
+	if (length > 0) {
 		total += length * sizeof (pkt->payload[0]);
 		total += sizeof (pkt->crc2);
 	}
@@ -86,7 +86,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + n, pkt->header, sizeof (*pkt->header));
 	n += sizeof (*pkt->header);
 
-	if (pkt_get_length(pkt) > 0) {
+	if (length > 0) {
 		memcpy(buf + n, pkt->payload, length * sizeof (pkt->payload[0]));
 		n += length * sizeof (pkt->payload[0]);
 
@@ -148,11 +148,15 @@ const char* pkt_get_payload(const pkt_t* pkt) {
  */
 
 pkt_status_code pkt_set_type(pkt_t *pkt, const ptypes_t type) {
-	if (type >> 2) {
+	switch (type) {
+	case PTYPE_DATA:
+	case PTYPE_ACK:
+	case PTYPE_NACK:
+		pkt->header->type = type;
+		return PKT_OK;
+	default:
 		return E_TYPE;
 	}
-	pkt->header->type = type;
-	return PKT_OK;
 }
 
 pkt_status_code pkt_set_tr(pkt_t *pkt, const uint8_t tr) {
