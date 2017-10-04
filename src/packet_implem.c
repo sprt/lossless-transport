@@ -6,10 +6,10 @@
 #include "packet_interface.h"
 
 struct __attribute__((__packed__)) pkt {
-	struct {
-		unsigned int type : 2;
-		unsigned int tr : 1;
+	struct __attribute__((__packed__)) {
 		unsigned int window : 5;
+		unsigned int tr : 1;
+		unsigned int type : 2;
 		uint8_t seqnum;
 		uint16_t length;
 		uint32_t timestamp;
