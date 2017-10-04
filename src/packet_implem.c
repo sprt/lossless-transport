@@ -9,13 +9,9 @@
 
 struct __attribute__((__packed__)) pkt {
 	struct __attribute__((__packed__)) {
-		/* From the MSB to the LSB:
-		 * Type (2 bits), TR (1 bit), Window (5 bits).
-		 *
-		 * Didn't use bit fields as their order in memory isn't
-		 * well-defined. */
-		uint8_t ttw;
-
+		unsigned int window : 5;
+		unsigned int tr : 1;
+		unsigned int type : 2;
 		uint8_t seqnum;
 		uint16_t length;
 		uint32_t timestamp;
@@ -41,7 +37,9 @@ pkt_t* pkt_new() {
 		return NULL;
 	}
 
-	pkt->header->ttw = 0;
+	pkt->header->type = 0;
+	pkt->header->tr = 0;
+	pkt->header->window = 0;
 	pkt->header->seqnum = 0;
 	pkt->header->length = 0;
 	pkt->header->timestamp = 0;
@@ -109,15 +107,15 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
  */
 
 ptypes_t pkt_get_type(const pkt_t* pkt) {
-	return (ptypes_t) ((pkt->header->ttw & (0x3 << 6)) >> 6);
+	return (ptypes_t) pkt->header->type;
 }
 
 uint8_t pkt_get_tr(const pkt_t* pkt) {
-	return (uint8_t) ((pkt->header->ttw & (0x1 << 5)) >> 5);
+	return (uint8_t) pkt->header->tr;
 }
 
 uint8_t pkt_get_window(const pkt_t* pkt) {
-	return (uint8_t) (pkt->header->ttw & 0x1f);
+	return (uint8_t) pkt->header->window;
 }
 
 uint8_t pkt_get_seqnum(const pkt_t* pkt) {
@@ -150,32 +148,26 @@ const char* pkt_get_payload(const pkt_t* pkt) {
  */
 
 pkt_status_code pkt_set_type(pkt_t *pkt, const ptypes_t type) {
-	printf("pkt_set_type: %d\n", type);
 	if (type == 0 || type >> 2) {
 		return E_TYPE;
 	}
-	pkt->header->ttw &= ~(0x3 << 6);
-	pkt->header->ttw |= type << 6;
+	pkt->header->type = type;
 	return PKT_OK;
 }
 
 pkt_status_code pkt_set_tr(pkt_t *pkt, const uint8_t tr) {
-	printf("pkt_set_type: %d\n", tr);
 	if (tr >> 1) {
 		return E_TR;
 	}
-	pkt->header->ttw &= ~(1 << 5);
-	pkt->header->ttw |= tr << 5;
+	pkt->header->tr = tr;
 	return PKT_OK;
 }
 
 pkt_status_code pkt_set_window(pkt_t *pkt, const uint8_t window) {
-	printf("pkt_set_window: %d\n", window);
 	if (window > MAX_WINDOW_SIZE) {
 		return E_WINDOW;
 	}
-	pkt->header->ttw &= ~0x1f;
-	pkt->header->ttw |= window;
+	pkt->header->window = window;
 	return PKT_OK;
 }
 
