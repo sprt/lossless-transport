@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <netinet/in.h>
+#include <zlib.h>
+
 #include "packet_interface.h"
 
 struct __attribute__((__packed__)) pkt {
@@ -11,8 +13,8 @@ struct __attribute__((__packed__)) pkt {
 		uint8_t seqnum;
 		uint16_t length;
 		uint32_t timestamp;
-		uint32_t crc1;
 	} *header;
+	uint32_t crc1;
 
 	char *payload;
 	uint32_t crc2;
@@ -37,7 +39,7 @@ pkt_t* pkt_new() {
 	pkt->header->seqnum = 0;
 	pkt->header->length = 0;
 	pkt->header->timestamp = 0;
-	pkt->header->crc1 = 0;
+	pkt->crc1 = 0;
 
 	return pkt;
 }
@@ -60,37 +62,38 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
-
 	size_t total = sizeof (*pkt->header);
+	size_t written = 0;
+
 	if (length > 0) {
 		total += length * sizeof (pkt->payload[0]);
 		total += sizeof (pkt->crc2);
 	}
-
-	fprintf(stderr, "pkt_encode:\n");
-	fprintf(stderr, "pkt_get_length: %d\n", length);
-	fprintf(stderr, "len: %zu\n", *len);
-	fprintf(stderr, "total: %zu\n\n", total);
 
 	if (total > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}
 
-	size_t n = 0;
+	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
+	written += sizeof (*pkt->header);
 
-	memcpy(buf + n, pkt->header, sizeof (*pkt->header));
-	n += sizeof (*pkt->header);
+	uint32_t header_crc = htonl(crc32(0, (unsigned char *) pkt->header, sizeof (*pkt->header)));
+	memcpy(buf + written, &header_crc, sizeof (header_crc));
+	written += sizeof (header_crc);
 
 	if (length > 0) {
-		memcpy(buf + n, pkt->payload, length * sizeof (pkt->payload[0]));
-		n += length * sizeof (pkt->payload[0]);
+		size_t payload_size = length * sizeof (pkt->payload[0]);
 
-		memcpy(buf + n, &pkt->crc2, sizeof (pkt->crc2));
-		n += sizeof (pkt->crc2);
+		memcpy(buf + written, pkt->payload, payload_size);
+		written += payload_size;
+
+		uint32_t payload_crc = htonl(crc32(0, (unsigned char *) pkt->payload, payload_size));
+		memcpy(buf + written, &payload_crc, sizeof (payload_crc));
+		written += sizeof (payload_crc);
 	}
 
-	*len = n;
+	*len = written;
 	return PKT_OK;
 }
 
@@ -124,7 +127,7 @@ uint32_t pkt_get_timestamp(const pkt_t* pkt) {
 }
 
 uint32_t pkt_get_crc1(const pkt_t* pkt) {
-	return ntohl(pkt->header->crc1);
+	return ntohl(pkt->crc1);
 }
 
 uint32_t pkt_get_crc2(const pkt_t* pkt) {
@@ -187,7 +190,7 @@ pkt_status_code pkt_set_timestamp(pkt_t *pkt, const uint32_t timestamp) {
 }
 
 pkt_status_code pkt_set_crc1(pkt_t *pkt, const uint32_t crc1) {
-	pkt->header->crc1 = htonl(crc1);
+	pkt->crc1 = htonl(crc1);
 	return PKT_OK;
 }
 
