@@ -68,7 +68,7 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
-	size_t total = sizeof (*pkt->header);
+	size_t total = sizeof (*pkt->header) + sizeof (pkt->crc1);
 	size_t written = 0;
 
 	if (length > 0) {
