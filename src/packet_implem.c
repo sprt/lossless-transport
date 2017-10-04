@@ -9,7 +9,13 @@
 
 struct __attribute__((__packed__)) pkt {
 	struct __attribute__((__packed__)) {
-		uint8_t ttw; // type (2 bits), tr (1 bit), window (5 bits)
+		/* From the LSB to the MSB:
+		 * Type (2 bits), TR (1 bit), Window (5 bits).
+		 *
+		 * Didn't use bit fields as their order in memory isn't
+		 * well-defined. */
+		uint8_t ttw;
+
 		uint8_t seqnum;
 		uint16_t length;
 		uint32_t timestamp;
