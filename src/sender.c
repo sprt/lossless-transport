@@ -24,9 +24,6 @@ int main() {
 	}
 	printf("\n");
 
-	FILE *f = fopen("out.dat", "w+");
-	fwrite(buf, sizeof (buf[0]), n, f);
-
 	pkt_del(pkt);
 	return 0;
 }

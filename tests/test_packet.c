@@ -34,6 +34,9 @@ void test_pkt_set_type(void) {
 	CU_ASSERT_EQUAL(pkt_set_type(pkt, 0), E_TYPE);
 	CU_ASSERT_NOT_EQUAL(pkt_get_type(pkt), 0);
 
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, 10), E_TYPE);
+	CU_ASSERT_NOT_EQUAL(pkt_get_type(pkt), 10);
+
 	pkt_del(pkt);
 }
 
@@ -49,6 +52,19 @@ void test_pkt_set_tr(void) {
 
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 3), E_TR);
 	CU_ASSERT_NOT_EQUAL(pkt_get_tr(pkt), 3);
+
+	pkt_del(pkt);
+}
+
+void test_pkt_set_window(void) {
+	pkt_t *pkt = pkt_new();
+	CU_ASSERT_PTR_NOT_NULL_FATAL(pkt);
+
+	CU_ASSERT_EQUAL(pkt_set_window(pkt, MAX_WINDOW_SIZE), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_get_window(pkt), MAX_WINDOW_SIZE);
+
+	CU_ASSERT_EQUAL(pkt_set_window(pkt, MAX_WINDOW_SIZE + 1), E_WINDOW);
+	CU_ASSERT_NOT_EQUAL(pkt_get_window(pkt), MAX_WINDOW_SIZE + 1);
 
 	pkt_del(pkt);
 }
@@ -78,6 +94,7 @@ int main(void) {
 		{"pkt_new", test_pkt_new},
 		{"pkt_set_type", test_pkt_set_type},
 		{"pkt_set_tr", test_pkt_set_tr},
+		{"pkt_set_window", test_pkt_set_window},
 		{"pkt_set_crc1", test_pkt_set_crc1},
 		CU_TEST_INFO_NULL,
 	};
