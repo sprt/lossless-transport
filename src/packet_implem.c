@@ -123,6 +123,9 @@ uint8_t pkt_get_seqnum(const pkt_t* pkt) {
 }
 
 uint16_t pkt_get_length(const pkt_t* pkt) {
+	if (pkt_get_tr(pkt)) {
+		return 0;
+	}
 	return ntohs(pkt->header->length);
 }
 
