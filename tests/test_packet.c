@@ -6,7 +6,7 @@
 void test_pkt_new(void) {
 	pkt_t *pkt = pkt_new();
 	CU_ASSERT_PTR_NOT_NULL_FATAL(pkt);
-	CU_ASSERT_EQUAL(pkt_get_type(pkt), 0);
+	CU_ASSERT_EQUAL(pkt_get_type(pkt), PTYPE_DATA);
 	CU_ASSERT_EQUAL(pkt_get_tr(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_window(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_seqnum(pkt), 0);

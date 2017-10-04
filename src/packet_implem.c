@@ -37,7 +37,7 @@ pkt_t* pkt_new() {
 		return NULL;
 	}
 
-	pkt->header->type = 0;
+	pkt->header->type = PTYPE_DATA;
 	pkt->header->tr = 0;
 	pkt->header->window = 0;
 	pkt->header->seqnum = 0;
