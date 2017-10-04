@@ -141,16 +141,12 @@ const char* pkt_get_payload(const pkt_t* pkt) {
  */
 
 pkt_status_code pkt_set_type(pkt_t *pkt, const ptypes_t type) {
-	switch (type) {
-	case PTYPE_DATA:
-	case PTYPE_ACK:
-	case PTYPE_NACK:
-		pkt->header->ttw &= ~0x3;
-		pkt->header->ttw |= type;
-		return PKT_OK;
-	default:
+	if (type == 0 || type >> 2) {
 		return E_TYPE;
 	}
+	pkt->header->ttw &= ~0x3;
+	pkt->header->ttw |= type;
+	return PKT_OK;
 }
 
 pkt_status_code pkt_set_tr(pkt_t *pkt, const uint8_t tr) {
