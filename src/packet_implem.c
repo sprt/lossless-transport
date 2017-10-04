@@ -26,14 +26,6 @@ pkt_t* pkt_new() {
 		return NULL;
 	}
 
-	pkt->header->type = 0;
-	pkt->header->tr = 0;
-	pkt->header->window = 0;
-	pkt->header->seqnum = 0;
-	pkt->header->length = 0;
-	pkt->header->timestamp = 0;
-	pkt->header->crc1 = 0;
-
 	pkt->payload = NULL;
 	pkt->crc2 = 0;
 
@@ -42,6 +34,14 @@ pkt_t* pkt_new() {
 		pkt_del(pkt);
 		return NULL;
 	}
+
+	pkt->header->type = 0;
+	pkt->header->tr = 0;
+	pkt->header->window = 0;
+	pkt->header->seqnum = 0;
+	pkt->header->length = 0;
+	pkt->header->timestamp = 0;
+	pkt->header->crc1 = 0;
 
 	return pkt;
 }
