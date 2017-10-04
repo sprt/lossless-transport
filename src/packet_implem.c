@@ -26,12 +26,6 @@ pkt_t* pkt_new() {
 		return NULL;
 	}
 
-	pkt->header = malloc(sizeof (*pkt->header));
-	if (pkt->header == NULL) {
-		pkt_del(pkt);
-		return NULL;
-	}
-
 	pkt->header->type = 0;
 	pkt->header->tr = 0;
 	pkt->header->window = 0;
@@ -42,6 +36,12 @@ pkt_t* pkt_new() {
 
 	pkt->payload = NULL;
 	pkt->crc2 = 0;
+
+	pkt->header = malloc(sizeof (*pkt->header));
+	if (pkt->header == NULL) {
+		pkt_del(pkt);
+		return NULL;
+	}
 
 	return pkt;
 }
