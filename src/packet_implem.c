@@ -7,9 +7,7 @@
 
 struct __attribute__((__packed__)) pkt {
 	struct __attribute__((__packed__)) {
-		unsigned int window : 5;
-		unsigned int tr : 1;
-		unsigned int type : 2;
+		uint8_t ttw; // type (2 bits), tr (1 bit), window (5 bits)
 		uint8_t seqnum;
 		uint16_t length;
 		uint32_t timestamp;
@@ -35,9 +33,7 @@ pkt_t* pkt_new() {
 		return NULL;
 	}
 
-	pkt->header->type = 0;
-	pkt->header->tr = 0;
-	pkt->header->window = 0;
+	pkt->header->ttw = 0;
 	pkt->header->seqnum = 0;
 	pkt->header->length = 0;
 	pkt->header->timestamp = 0;
@@ -104,15 +100,15 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
  */
 
 ptypes_t pkt_get_type(const pkt_t* pkt) {
-	return (ptypes_t) pkt->header->type;
+	return (ptypes_t) (pkt->header->ttw & 0x3);
 }
 
 uint8_t pkt_get_tr(const pkt_t* pkt) {
-	return (uint8_t) pkt->header->tr;
+	return (uint8_t) ((pkt->header->ttw & 0x4) >> 2);
 }
 
 uint8_t pkt_get_window(const pkt_t* pkt) {
-	return (uint8_t) pkt->header->window;
+	return (uint8_t) ((pkt->header->ttw & 0xf8) >> 3);
 }
 
 uint8_t pkt_get_seqnum(const pkt_t* pkt) {
@@ -149,7 +145,8 @@ pkt_status_code pkt_set_type(pkt_t *pkt, const ptypes_t type) {
 	case PTYPE_DATA:
 	case PTYPE_ACK:
 	case PTYPE_NACK:
-		pkt->header->type = type;
+		pkt->header->ttw &= ~0x3;
+		pkt->header->ttw |= type;
 		return PKT_OK;
 	default:
 		return E_TYPE;
@@ -160,7 +157,8 @@ pkt_status_code pkt_set_tr(pkt_t *pkt, const uint8_t tr) {
 	if (tr >> 1) {
 		return E_TR;
 	}
-	pkt->header->tr = tr;
+	pkt->header->ttw &= ~(1 << 2);
+	pkt->header->ttw |= tr << 2;
 	return PKT_OK;
 }
 
@@ -168,7 +166,8 @@ pkt_status_code pkt_set_window(pkt_t *pkt, const uint8_t window) {
 	if (window > MAX_WINDOW_SIZE) {
 		return E_WINDOW;
 	}
-	pkt->header->window = window;
+	pkt->header->ttw &= ~0xf8;
+	pkt->header->ttw |= window << 3;
 	return PKT_OK;
 }
 
