@@ -6,8 +6,9 @@
 
 int main() {
 	pkt_t *pkt = pkt_new();
-	pkt_set_tr(pkt, 1);
-	pkt_set_window(pkt, 11);
+	pkt_set_type(pkt, 1);
+	pkt_set_tr(pkt, 0);
+	pkt_set_window(pkt, 28);
 
 	pkt_set_seqnum(pkt, 0x7b);
 	char payload[] = "hello world";
