@@ -18,7 +18,7 @@ struct __attribute__((__packed__)) pkt {
 	} *header;
 	uint32_t crc1;
 
-	char *payload;
+	char payload[MAX_PAYLOAD_SIZE];
 	uint32_t crc2;
 };
 
@@ -27,9 +27,6 @@ pkt_t* pkt_new() {
 	if (pkt == NULL) {
 		return NULL;
 	}
-
-	pkt->payload = NULL;
-	pkt->crc2 = 0;
 
 	pkt->header = malloc(sizeof (*pkt->header));
 	if (pkt->header == NULL) {
@@ -45,12 +42,14 @@ pkt_t* pkt_new() {
 	pkt->header->timestamp = 0;
 	pkt->crc1 = 0;
 
+	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
+	pkt->crc2 = 0;
+
 	return pkt;
 }
 
 void pkt_del(pkt_t *pkt) {
 	free(pkt->header);
-	free(pkt->payload);
 	free(pkt);
 }
 
@@ -66,18 +65,17 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
-	size_t total = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	size_t written = 0;
+	size_t payload_size = length * sizeof (*pkt->payload);
 
-	if (length > 0) {
-		total += length * sizeof (pkt->payload[0]);
-		total += sizeof (pkt->crc2);
-	}
+	size_t tot_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
+	tot_size += payload_size + ((length > 0) ? sizeof (pkt->crc2) : 0);
 
-	if (total > *len) {
+	if (tot_size > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}
+
+	size_t written = 0;
 
 	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
 	written += sizeof (*pkt->header);
@@ -86,12 +84,10 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + written, &header_crc, sizeof (header_crc));
 	written += sizeof (header_crc);
 
+	memcpy(buf + written, pkt->payload, payload_size);
+	written += payload_size;
+
 	if (length > 0) {
-		size_t payload_size = length * sizeof (pkt->payload[0]);
-
-		memcpy(buf + written, pkt->payload, payload_size);
-		written += payload_size;
-
 		uint32_t payload_crc = htonl(crc32(0, (unsigned char *) pkt->payload, payload_size));
 		memcpy(buf + written, &payload_crc, sizeof (payload_crc));
 		written += sizeof (payload_crc);
@@ -142,6 +138,9 @@ uint32_t pkt_get_crc2(const pkt_t* pkt) {
 }
 
 const char* pkt_get_payload(const pkt_t* pkt) {
+	if (pkt_get_length(pkt) == 0) {
+		return NULL;
+	}
 	return pkt->payload;
 }
 
@@ -180,7 +179,6 @@ pkt_status_code pkt_set_seqnum(pkt_t *pkt, const uint8_t seqnum) {
 }
 
 pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length) {
-	fprintf(stderr, "pkt_set_length: %d\n\n", length);
 	if (length > MAX_PAYLOAD_SIZE) {
 		return E_LENGTH;
 	}
@@ -203,22 +201,11 @@ pkt_status_code pkt_set_crc2(pkt_t *pkt, const uint32_t crc2) {
 	return PKT_OK;
 }
 
-pkt_status_code pkt_set_payload(pkt_t *pkt,
-                                const char *data,
-                                const uint16_t length) {
-	fprintf(stderr, "pkt_set_payload:\n");
-	fprintf(stderr, "length: %d\n\n", length);
-
+pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t length) {
 	pkt_status_code code = pkt_set_length(pkt, length);
 	if (code != PKT_OK) {
 		return code;
 	}
-
-	pkt->payload = realloc(pkt->payload, length * sizeof (pkt->payload[0]));
-	if (pkt->payload == NULL) {
-		return E_NOMEM;
-	}
-
 	memcpy(pkt->payload, data, length);
 	return PKT_OK;
 }
