@@ -206,6 +206,7 @@ pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t len
 	if (code != PKT_OK) {
 		return code;
 	}
+	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
 	memcpy(pkt->payload, data, length);
 	return PKT_OK;
 }
