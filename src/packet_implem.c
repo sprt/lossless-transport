@@ -70,7 +70,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	size_t payload_size = length * sizeof (*pkt->payload);
 
 	size_t tot_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	tot_size += payload_size + ((length > 0) ? sizeof (pkt->crc2) : 0);
+	tot_size += payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
 
 	if (tot_size > *len) {
 		*len = 0;
