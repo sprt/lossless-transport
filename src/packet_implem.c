@@ -207,11 +207,15 @@ pkt_status_code pkt_set_crc2(pkt_t *pkt, const uint32_t crc2) {
 }
 
 pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t length) {
-	pkt_status_code code = pkt_set_length(pkt, length);
+	uint16_t actual = length;
+	if (data == NULL) {
+		actual = 0;
+	}
+	pkt_status_code code = pkt_set_length(pkt, actual);
 	if (code != PKT_OK) {
 		return code;
 	}
 	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
-	memcpy(pkt->payload, data, length);
+	memcpy(pkt->payload, data, actual);
 	return PKT_OK;
 }

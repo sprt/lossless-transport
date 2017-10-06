@@ -77,6 +77,10 @@ void test_pkt_set_length(void) {
 
 	CU_ASSERT_EQUAL(pkt_set_length(pkt, MAX_PAYLOAD_SIZE + 1), E_LENGTH);
 	CU_ASSERT_NOT_EQUAL(pkt_get_length(pkt), MAX_PAYLOAD_SIZE + 1);
+
+	CU_ASSERT_EQUAL(pkt_set_length(pkt, 0), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_get_length(pkt), 0);
+	CU_ASSERT_PTR_NULL(pkt_get_payload(pkt));
 }
 
 void test_pkt_get_length(void) {
@@ -99,6 +103,10 @@ void test_pkt_set_crc1(void) {
 }
 
 void test_pkt_set_payload(void) {
+	CU_ASSERT_EQUAL(pkt_set_payload(pkt, NULL, 10), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_get_length(pkt), 0);
+	CU_ASSERT_PTR_NULL(pkt_get_payload(pkt));
+
 	char hello[] = "hello";
 	CU_ASSERT_EQUAL(pkt_set_payload(pkt, hello, strlen(hello)), PKT_OK);
 	CU_ASSERT_NSTRING_EQUAL(pkt_get_payload(pkt), hello, strlen(hello));
@@ -109,7 +117,9 @@ void test_pkt_set_payload(void) {
 	CU_ASSERT_NSTRING_NOT_EQUAL(pkt_get_payload(pkt), too_large, MAX_PAYLOAD_SIZE);
 	CU_ASSERT_NOT_EQUAL(pkt_get_length(pkt), MAX_PAYLOAD_SIZE + 1);
 
-	// TODO: test CRC1 is computed with TR set to 0
+	CU_ASSERT_EQUAL(pkt_set_payload(pkt, hello, 0), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_get_length(pkt), 0);
+	CU_ASSERT_PTR_NULL(pkt_get_payload(pkt));
 }
 
 void test_pkt_set_crc2(void) {
