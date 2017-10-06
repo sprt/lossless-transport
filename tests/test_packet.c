@@ -216,10 +216,13 @@ void test_pkt_encode_computes_crc1_with_tr0(void) {
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 1), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_encode(pkt, buf_tr1, &n_tr1), PKT_OK);
 
-	CU_ASSERT_EQUAL(n_tr0, n_tr1);
+	CU_ASSERT_EQUAL_FATAL(n_tr0, n_tr1);
 
 	size_t offset = 1 + 1 + 2 + 4;
 	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, buf_tr1 + offset, sizeof (uint32_t));
+
+	unsigned char crc[] = {0x4c, 0xbf, 0x1d, 0x84};
+	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, crc, sizeof (uint32_t));
 }
 
 int main(void) {
