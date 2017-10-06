@@ -7,15 +7,17 @@
 
 #include "packet_interface.h"
 
+struct __attribute__((__packed__)) header {
+	unsigned int window : 5;
+	unsigned int tr : 1;
+	unsigned int type : 2;
+	uint8_t seqnum;
+	uint16_t length;
+	uint32_t timestamp;
+};
+
 struct __attribute__((__packed__)) pkt {
-	struct __attribute__((__packed__)) {
-		unsigned int window : 5;
-		unsigned int tr : 1;
-		unsigned int type : 2;
-		uint8_t seqnum;
-		uint16_t length;
-		uint32_t timestamp;
-	} *header;
+	struct header *header;
 	uint32_t crc1;
 
 	char payload[MAX_PAYLOAD_SIZE];
@@ -80,7 +82,10 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
 	written += sizeof (*pkt->header);
 
-	uint32_t header_crc = htonl(crc32(0, (unsigned char *) pkt->header, sizeof (*pkt->header)));
+	struct header header_copy = *pkt->header;
+	header_copy.tr = 0;
+	uint32_t header_crc = htonl(crc32(0, (unsigned char *) &header_copy, sizeof (header_copy)));
+
 	memcpy(buf + written, &header_crc, sizeof (header_crc));
 	written += sizeof (header_crc);
 

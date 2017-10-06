@@ -3,6 +3,8 @@
 
 #include "../src/packet_interface.h"
 
+#define BUF_SIZE 1024
+
 pkt_t *pkt = NULL;
 
 void pkt_setup(void) {
@@ -115,6 +117,22 @@ void test_pkt_set_crc2(void) {
 	CU_ASSERT_EQUAL(pkt_get_crc2(pkt), 0xffffffff);
 }
 
+void test_pkt_encode_computes_crc1_with_tr0(void) {
+	char buf_tr0[BUF_SIZE] = {0};
+	size_t n_tr0 = BUF_SIZE;
+	CU_ASSERT_EQUAL(pkt_encode(pkt, buf_tr0, &n_tr0), PKT_OK);
+
+	char buf_tr1[BUF_SIZE] = {0};
+	size_t n_tr1 = BUF_SIZE;
+	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 1), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_encode(pkt, buf_tr1, &n_tr1), PKT_OK);
+
+	CU_ASSERT_EQUAL(n_tr0, n_tr1);
+
+	size_t offset = 1 + 1 + 2 + 4;
+	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, buf_tr1 + offset, sizeof (uint32_t));
+}
+
 int main(void) {
 	if (CU_initialize_registry() != CUE_SUCCESS) {
 		return CU_get_error();
@@ -132,6 +150,7 @@ int main(void) {
 		{"pkt_set_crc1", test_pkt_set_crc1},
 		{"pkt_set_payload", test_pkt_set_payload},
 		{"pkt_set_crc2", test_pkt_set_crc2},
+		{"pkt_encode_computes_crc1_with_tr0", test_pkt_encode_computes_crc1_with_tr0},
 		CU_TEST_INFO_NULL,
 	};
 
