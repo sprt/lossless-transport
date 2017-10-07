@@ -66,13 +66,13 @@ uint32_t compute_header_crc32(const struct header *h) {
 
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	size_t header_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	if (len < header_size) {
-		return E_NOHEADER;
+	if (len < header_size) { //Si le nb de byte recus est plus petit que la taille d'un header
+		return E_NOHEADER; //C'est qu'il y a pas de header
 	}
 
 	size_t read = 0;
 
-	memcpy(pkt->header, data + read, sizeof (*pkt->header));
+	memcpy(pkt->header, data + read, sizeof (*pkt->header)); //on met le début de data (pkt recu) dans le header
 	read += sizeof (*pkt->header);
 
 	if (pkt_get_type(pkt) == 0) return E_TYPE;
@@ -82,25 +82,25 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 	// If there's no payload, we should have len == header_size.
 	uint16_t length = pkt_get_length(pkt);
-	if (length == 0 && len > header_size) {
-		return E_UNCONSISTENT;
+	if (length == 0 && len > header_size) { // len est le nb de bytes recu
+		return E_UNCONSISTENT; //Donc si le nb de bytes recus est > que le header mais que length (taille du payload) vaut 0, il y a erreur
 	}
 
-	memcpy(&pkt->crc1, data + read, sizeof (pkt->crc1));
+	memcpy(&pkt->crc1, data + read, sizeof (pkt->crc1)); //on met ce qui suit le header (le crc1) dans l'espace crc1 de pkt
 	read += sizeof (pkt->crc1);
 
-	if (pkt_get_crc1(pkt) != compute_header_crc32(pkt->header)) {
+	if (pkt_get_crc1(pkt) != compute_header_crc32(pkt->header)) { //Si le crc qu'on a recu et mis dans le pkt correspond pas au crc du header
 		return E_CRC;
 	}
 
 	size_t payload_size = length * sizeof (*pkt->payload);
-	memcpy(pkt->payload, data + read, payload_size);
+	memcpy(pkt->payload, data + read, payload_size); //on met ce qui suit le crc1 (le payload) dans l'espace payload de pkt
 	read += payload_size;
 
-	if (payload_size > 0) {
+	if (payload_size > 0) { // Si il y a un payload il faut calculer un crc2
 		memcpy(&pkt->crc2, data + read, sizeof (pkt->crc2));
 		uint32_t computed_crc2 = crc32(0, (unsigned char *) pkt->payload, payload_size);
-		if (pkt_get_crc2(pkt) != computed_crc2) {
+		if (pkt_get_crc2(pkt) != computed_crc2) { // Si le crc2 du pkt correspond pas a celui qu'on a RECALCULE sur le payload
 			return E_CRC;
 		}
 	}
@@ -113,32 +113,32 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	size_t payload_size = length * sizeof (*pkt->payload);
 
 	size_t tot_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	tot_size += payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
+	tot_size += payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0); //si il y a un payload on met le crc2
 
-	if (tot_size > *len) {
+	if (tot_size > *len) { //si la taille depasse la taille dispo
 		*len = 0;
 		return E_NOMEM;
 	}
 
 	size_t written = 0;
 
-	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
+	memcpy(buf + written, pkt->header, sizeof (*pkt->header)); //on met le header dans le debut du buf
 	written += sizeof (*pkt->header);
 
 	uint32_t header_crc = htonl(compute_header_crc32(pkt->header));
-	memcpy(buf + written, &header_crc, sizeof (header_crc));
+	memcpy(buf + written, &header_crc, sizeof (header_crc)); //on met le crc dans le buf apres le header car on a incremente written
 	written += sizeof (header_crc);
 
 	memcpy(buf + written, pkt->payload, payload_size);
 	written += payload_size;
 
-	if (payload_size > 0) {
+	if (payload_size > 0) { //Si il y a un payload il y a un crc pour ce payload
 		uint32_t payload_crc = htonl(crc32(0, (unsigned char *) pkt->payload, payload_size));
 		memcpy(buf + written, &payload_crc, sizeof (payload_crc));
 		written += sizeof (payload_crc);
 	}
 
-	*len = written;
+	*len = written; //on remplace len par le nb de bytes ecrits
 	return PKT_OK;
 }
 
