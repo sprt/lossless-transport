@@ -2,6 +2,7 @@ sender
 receiver
 test
 
+.DS_Store
 .vscode/*
 
 # Created by https://www.gitignore.io/api/clion
