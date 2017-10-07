@@ -164,6 +164,35 @@ void test_pkt_decode(void) {
 	CU_ASSERT_NSTRING_EQUAL(pkt_get_payload(pkt), hello_world, strlen(hello_world));
 }
 
+void test_pkt_encode_decode(void) {
+	char encoded[BUF_SIZE] = {0};
+	char hello_world[] = "hello world";
+	size_t n = BUF_SIZE;
+
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 0), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_window(pkt, 28), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_seqnum(pkt, 0x7b), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_timestamp(pkt, 0x17), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_payload(pkt, hello_world, strlen(hello_world)), PKT_OK);
+
+	CU_ASSERT_EQUAL(pkt_encode(pkt, encoded, &n), PKT_OK);
+
+	pkt_t *pkt2 = pkt_new();
+	CU_ASSERT_PTR_NOT_NULL_FATAL(pkt2);
+	CU_ASSERT_EQUAL(pkt_decode(encoded, n, pkt2), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_get_type(pkt2), pkt_get_type(pkt));
+	CU_ASSERT_EQUAL(pkt_get_tr(pkt2), pkt_get_tr(pkt));
+	CU_ASSERT_EQUAL(pkt_get_window(pkt2), pkt_get_window(pkt));
+	CU_ASSERT_EQUAL(pkt_get_seqnum(pkt2), pkt_get_seqnum(pkt));
+	CU_ASSERT_EQUAL(pkt_get_timestamp(pkt2), pkt_get_timestamp(pkt));
+	uint16_t length = pkt_get_length(pkt2);
+	CU_ASSERT_EQUAL_FATAL(length, pkt_get_length(pkt));
+	CU_ASSERT_NSTRING_EQUAL(pkt_get_payload(pkt2), pkt_get_payload(pkt), length);
+
+	pkt_del(pkt2);
+}
+
 void test_pkt_encode_tr0(void) {
 	char actual[BUF_SIZE] = {0};
 	char hello_world[] = "hello world";
@@ -282,6 +311,7 @@ int main(void) {
 		{"pkt_set_payload", test_pkt_set_payload},
 		{"pkt_set_crc2", test_pkt_set_crc2},
 		{"pkt_decode", test_pkt_decode},
+		{"pkt_encode_decode", test_pkt_encode_decode},
 		{"pkt_encode_tr0", test_pkt_encode_tr0},
 		{"pkt_encode_tr1", test_pkt_encode_tr1},
 		{"pkt_encode_length0", test_pkt_encode_length0},
