@@ -80,7 +80,8 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	if (pkt_get_window(pkt) > MAX_WINDOW_SIZE) return E_WINDOW;
 	if (pkt_get_length(pkt) > MAX_PAYLOAD_SIZE) return E_LENGTH;
 
-	// If there's no payload, we should have len == header_size.
+	// If there's no payload, the packet should only be big enough to
+	// fit the header.
 	uint16_t length = pkt_get_length(pkt);
 	if (length == 0 && len > header_size) {
 		return E_UNCONSISTENT;
