@@ -10,9 +10,9 @@ tests:
 	./test
 
 sender:
-	gcc -std=c99 -Werror -Wall -Wextra -Wpedantic -pedantic-errors \
+	gcc -g -std=c99 -Werror -Wall -Wextra -Wpedantic -pedantic-errors \
 	-Wshadow -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-	-Wnull-dereference -Wformat=2 \
+	-Wnull-dereference -Wformat=2 -fsanitize=address \
 	src/packet_implem.c src/sender.c -lz -o sender
 
 clean:
