@@ -5,7 +5,7 @@
 
 #define BUF_SIZE 1024
 
-pkt_t *pkt = NULL;
+static pkt_t *pkt = NULL;
 
 void pkt_setup(void) {
 	pkt = pkt_new();
@@ -127,12 +127,49 @@ void test_pkt_set_crc2(void) {
 	CU_ASSERT_EQUAL(pkt_get_crc2(pkt), 0xffffffff);
 }
 
+void test_pkt_decode(void) {
+	/*
+	 * CRC1 example
+	 * ------------
+	 *
+	 * Original CRC:			0x33dae306
+	 * Representation in memory:		06 e3 da 33 (little-endian)
+	 * Converted to network byte order:	33 da e3 06 (big-endian)
+	 * Converted back to host byte order:	06 e3 da 33 (little-endian)
+	 * Decoded CRC:				0x33dae306
+	 */
+
+	unsigned char raw[] = {
+		0x5c, // Window, TR, Type
+		0x7b, // Seqnum
+		0x00, 0x0b, // Length
+		0x17, 0x00, 0x00, 0x00, // Timestamp
+		0x33, 0xda, 0xe3, 0x06, // CRC1
+		0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, // Payload
+		0x6c, 0x64, // Payload
+		0x0d, 0x4a, 0x11, 0x85, // CRC2
+	};
+
+	CU_ASSERT_EQUAL_FATAL(pkt_decode((const char *) raw, sizeof (raw) / sizeof (*raw), pkt), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_get_type(pkt), PTYPE_DATA);
+	CU_ASSERT_EQUAL(pkt_get_tr(pkt), 0);
+	CU_ASSERT_EQUAL(pkt_get_window(pkt), 28);
+	CU_ASSERT_EQUAL(pkt_get_seqnum(pkt), 0x7b);
+	CU_ASSERT_EQUAL(pkt_get_timestamp(pkt), 0x17);
+	CU_ASSERT_EQUAL(pkt_get_crc1(pkt), 0x33dae306);
+	CU_ASSERT_EQUAL(pkt_get_crc2(pkt), 0x0d4a1185);
+
+	char hello_world[] = "hello world";
+	CU_ASSERT_EQUAL_FATAL(pkt_get_length(pkt), strlen(hello_world));
+	CU_ASSERT_NSTRING_EQUAL(pkt_get_payload(pkt), hello_world, strlen(hello_world));
+}
+
 void test_pkt_encode_tr0(void) {
 	char actual[BUF_SIZE] = {0};
 	char hello_world[] = "hello world";
 	size_t n = BUF_SIZE;
 
-	CU_ASSERT_EQUAL(pkt_set_type(pkt, 1), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 0), PKT_OK); // relevant
 	CU_ASSERT_EQUAL(pkt_set_window(pkt, 28), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_seqnum(pkt, 0x7b), PKT_OK);
@@ -160,7 +197,7 @@ void test_pkt_encode_tr1(void) {
 	char hello_world[] = "hello world";
 	size_t n = BUF_SIZE;
 
-	CU_ASSERT_EQUAL(pkt_set_type(pkt, 1), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 1), PKT_OK); // relevant
 	CU_ASSERT_EQUAL(pkt_set_window(pkt, 28), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_seqnum(pkt, 0x7b), PKT_OK);
@@ -185,7 +222,7 @@ void test_pkt_encode_length0(void) {
 	char hello_world[] = "hello world";
 	size_t n = BUF_SIZE;
 
-	CU_ASSERT_EQUAL(pkt_set_type(pkt, 1), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 0), PKT_OK); // relevant
 	CU_ASSERT_EQUAL(pkt_set_window(pkt, 28), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_seqnum(pkt, 0x7b), PKT_OK);
@@ -218,9 +255,11 @@ void test_pkt_encode_computes_crc1_with_tr0(void) {
 
 	CU_ASSERT_EQUAL_FATAL(n_tr0, n_tr1);
 
+	// Test CRCs are the same regardless of the TR field
 	size_t offset = 1 + 1 + 2 + 4;
 	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, buf_tr1 + offset, sizeof (uint32_t));
 
+	// Test CRCs are correct and stored in network byte order
 	unsigned char crc[] = {0x4c, 0xbf, 0x1d, 0x84};
 	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, crc, sizeof (uint32_t));
 }
@@ -242,6 +281,7 @@ int main(void) {
 		{"pkt_set_crc1", test_pkt_set_crc1},
 		{"pkt_set_payload", test_pkt_set_payload},
 		{"pkt_set_crc2", test_pkt_set_crc2},
+		{"pkt_decode", test_pkt_decode},
 		{"pkt_encode_tr0", test_pkt_encode_tr0},
 		{"pkt_encode_tr1", test_pkt_encode_tr1},
 		{"pkt_encode_length0", test_pkt_encode_length0},

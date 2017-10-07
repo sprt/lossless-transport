@@ -55,14 +55,57 @@ void pkt_del(pkt_t *pkt) {
 	free(pkt);
 }
 
-/* Ignore GCC warning. */
-#define UNUSED(x) (void) (x)
+/**
+ * Computes the CRC32 of a header with its TR field set to 0.
+ */
+uint32_t compute_header_crc32(const struct header *h) {
+	struct header copy = *h;
+	copy.tr = 0;
+	return crc32(0, (unsigned char *) &copy, sizeof (copy));
+}
 
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
-	UNUSED(data);
-	UNUSED(len);
-	UNUSED(pkt);
-	return E_UNCONSISTENT;
+	size_t header_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
+	if (len < header_size) {
+		return E_NOHEADER;
+	}
+
+	size_t read = 0;
+
+	memcpy(pkt->header, data + read, sizeof (*pkt->header));
+	read += sizeof (*pkt->header);
+
+	if (pkt_get_type(pkt) == 0) return E_TYPE;
+	if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_tr(pkt) != 0) return E_TR;
+	if (pkt_get_window(pkt) > MAX_WINDOW_SIZE) return E_WINDOW;
+	if (pkt_get_length(pkt) > MAX_PAYLOAD_SIZE) return E_LENGTH;
+
+	// If there's no payload, we should have len == header_size.
+	uint16_t length = pkt_get_length(pkt);
+	if (length == 0 && len > header_size) {
+		return E_UNCONSISTENT;
+	}
+
+	memcpy(&pkt->crc1, data + read, sizeof (pkt->crc1));
+	read += sizeof (pkt->crc1);
+
+	if (pkt_get_crc1(pkt) != compute_header_crc32(pkt->header)) {
+		return E_CRC;
+	}
+
+	size_t payload_size = length * sizeof (*pkt->payload);
+	memcpy(pkt->payload, data + read, payload_size);
+	read += payload_size;
+
+	if (payload_size > 0) {
+		memcpy(&pkt->crc2, data + read, sizeof (pkt->crc2));
+		uint32_t computed_crc2 = crc32(0, (unsigned char *) pkt->payload, payload_size);
+		if (pkt_get_crc2(pkt) != computed_crc2) {
+			return E_CRC;
+		}
+	}
+
+	return PKT_OK;
 }
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
@@ -82,17 +125,14 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
 	written += sizeof (*pkt->header);
 
-	struct header header_copy = *pkt->header;
-	header_copy.tr = 0;
-	uint32_t header_crc = htonl(crc32(0, (unsigned char *) &header_copy, sizeof (header_copy)));
-
+	uint32_t header_crc = htonl(compute_header_crc32(pkt->header));
 	memcpy(buf + written, &header_crc, sizeof (header_crc));
 	written += sizeof (header_crc);
 
 	memcpy(buf + written, pkt->payload, payload_size);
 	written += payload_size;
 
-	if (length > 0) {
+	if (payload_size > 0) {
 		uint32_t payload_crc = htonl(crc32(0, (unsigned char *) pkt->payload, payload_size));
 		memcpy(buf + written, &payload_crc, sizeof (payload_crc));
 		written += sizeof (payload_crc);
@@ -211,10 +251,12 @@ pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t len
 	if (data == NULL) {
 		actual = 0;
 	}
+
 	pkt_status_code code = pkt_set_length(pkt, actual);
 	if (code != PKT_OK) {
 		return code;
 	}
+
 	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
 	memcpy(pkt->payload, data, actual);
 	return PKT_OK;
