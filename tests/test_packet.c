@@ -4,7 +4,6 @@
 #include "../src/packet_interface.h"
 
 #define MAX_PACKET_SIZE 1 + 1 + 2 + 4 + 4 + MAX_PAYLOAD_SIZE + 4
-#define BUF_SIZE 1024
 
 static pkt_t *pkt = NULL;
 
@@ -190,9 +189,9 @@ void test_pkt_decode_len(void) {
 }
 
 void test_pkt_encode_decode(void) {
-	char encoded[BUF_SIZE] = {0};
+	char encoded[MAX_PACKET_SIZE] = {0};
 	char hello_world[] = "hello world";
-	size_t n = BUF_SIZE;
+	size_t n = MAX_PACKET_SIZE;
 
 	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 0), PKT_OK);
@@ -219,9 +218,9 @@ void test_pkt_encode_decode(void) {
 }
 
 void test_pkt_encode_tr0(void) {
-	char actual[BUF_SIZE] = {0};
+	char actual[MAX_PACKET_SIZE] = {0};
 	char hello_world[] = "hello world";
-	size_t n = BUF_SIZE;
+	size_t n = MAX_PACKET_SIZE;
 
 	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 0), PKT_OK); // relevant
@@ -247,9 +246,9 @@ void test_pkt_encode_tr0(void) {
 }
 
 void test_pkt_encode_tr1(void) {
-	char actual[BUF_SIZE] = {0};
+	char actual[MAX_PACKET_SIZE] = {0};
 	char hello_world[] = "hello world";
-	size_t n = BUF_SIZE;
+	size_t n = MAX_PACKET_SIZE;
 
 	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 1), PKT_OK); // relevant
@@ -272,9 +271,9 @@ void test_pkt_encode_tr1(void) {
 }
 
 void test_pkt_encode_length0(void) {
-	char actual[BUF_SIZE] = {0};
+	char actual[MAX_PACKET_SIZE] = {0};
 	char hello_world[] = "hello world";
-	size_t n = BUF_SIZE;
+	size_t n = MAX_PACKET_SIZE;
 
 	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 0), PKT_OK); // relevant
@@ -298,12 +297,12 @@ void test_pkt_encode_length0(void) {
 }
 
 void test_pkt_encode_computes_crc1_with_tr0(void) {
-	char buf_tr0[BUF_SIZE] = {0};
-	size_t n_tr0 = BUF_SIZE;
+	char buf_tr0[MAX_PACKET_SIZE] = {0};
+	size_t n_tr0 = MAX_PACKET_SIZE;
 	CU_ASSERT_EQUAL(pkt_encode(pkt, buf_tr0, &n_tr0), PKT_OK);
 
-	char buf_tr1[BUF_SIZE] = {0};
-	size_t n_tr1 = BUF_SIZE;
+	char buf_tr1[MAX_PACKET_SIZE] = {0};
+	size_t n_tr1 = MAX_PACKET_SIZE;
 	CU_ASSERT_EQUAL(pkt_set_tr(pkt, 1), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_encode(pkt, buf_tr1, &n_tr1), PKT_OK);
 
