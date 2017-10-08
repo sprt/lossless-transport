@@ -59,9 +59,9 @@ void pkt_del(pkt_t *pkt) {
  * Computes the CRC32 of the header with its TR field set to 0.
  */
 uint32_t pkt_compute_crc1(const pkt_t *pkt) {
-	struct header copy = *pkt->header;
-	copy.tr = 0;
-	return crc32(0, (unsigned char *) &copy, sizeof (copy));
+	struct header h = *pkt->header;
+	h.tr = 0;
+	return crc32(0, (unsigned char *) &h, sizeof (h));
 }
 
 /**
@@ -139,17 +139,17 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
 	written += sizeof (*pkt->header);
 
-	uint32_t header_crc = htonl(pkt_compute_crc1(pkt));
-	memcpy(buf + written, &header_crc, sizeof (header_crc));
-	written += sizeof (header_crc);
+	uint32_t crc1 = htonl(pkt_compute_crc1(pkt));
+	memcpy(buf + written, &crc1, sizeof (crc1));
+	written += sizeof (crc1);
 
 	memcpy(buf + written, pkt->payload, payload_size);
 	written += payload_size;
 
 	if (payload_size > 0) {
-		uint32_t payload_crc = htonl(pkt_compute_crc2(pkt, payload_size));
-		memcpy(buf + written, &payload_crc, sizeof (payload_crc));
-		written += sizeof (payload_crc);
+		uint32_t crc2 = htonl(pkt_compute_crc2(pkt, payload_size));
+		memcpy(buf + written, &crc2, sizeof (crc2));
+		written += sizeof (crc2);
 	}
 
 	*len = written;
