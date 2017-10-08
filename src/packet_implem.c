@@ -56,55 +56,67 @@ void pkt_del(pkt_t *pkt) {
 }
 
 /**
- * Computes the CRC32 of a header with its TR field set to 0.
+ * Computes the CRC32 of the header with its TR field set to 0.
  */
-uint32_t compute_header_crc32(const struct header *h) {
-	struct header copy = *h;
+uint32_t pkt_compute_crc1(const pkt_t *pkt) {
+	struct header copy = *pkt->header;
 	copy.tr = 0;
 	return crc32(0, (unsigned char *) &copy, sizeof (copy));
 }
 
+/**
+ * Computes the CRC32 of the payload. len is the size of the payload.
+ */
+uint32_t pkt_compute_crc2(const pkt_t *pkt, size_t len) {
+	return crc32(0, (unsigned char *) pkt->payload, len);
+}
+
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	size_t header_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	if (data == NULL || len < header_size) {
+	if (data == NULL || len < header_size)
 		return E_NOHEADER;
-	}
 
 	size_t read = 0;
 
 	memcpy(pkt->header, data + read, sizeof (*pkt->header));
 	read += sizeof (*pkt->header);
 
-	if (pkt_get_type(pkt) == 0) return E_TYPE;
-	if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_tr(pkt) != 0) return E_TR;
-	if (pkt_get_window(pkt) > MAX_WINDOW_SIZE) return E_WINDOW;
-	//if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_length(pkt) != 0) return E_UNCONSISTENT;
-	if (pkt_get_length(pkt) > MAX_PAYLOAD_SIZE) return E_LENGTH;
-
-	uint16_t length = pkt_get_length(pkt);
-	size_t payload_size = length * sizeof (*pkt->payload);
+	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
 	size_t total_size = header_size + payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
 
-	if (len != total_size) {
+	// Field errors should be returned in the order those fields are
+	// declared in the struct
+	if (pkt_get_type(pkt) == 0)
+		return E_TYPE;
+	if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_tr(pkt) != 0)
+		return E_TR;
+	if (pkt_get_window(pkt) > MAX_WINDOW_SIZE)
+		return E_WINDOW;
+	if (payload_size > MAX_PAYLOAD_SIZE)
+		return E_LENGTH;
+	// if (pkt_get_type(pkt) != PTYPE_DATA && payload_size != 0)
+	// 	// Not in the spec but makes sense, yet dangerous as it could
+	// 	// break other implementations
+	// 	return E_UNCONSISTENT;
+	if (len != total_size)
+		// Important to return now in order to prevent a potential
+		// overflow
 		return E_UNCONSISTENT;
-	}
 
 	memcpy(&pkt->crc1, data + read, sizeof (pkt->crc1));
 	read += sizeof (pkt->crc1);
-
-	if (pkt_get_crc1(pkt) != compute_header_crc32(pkt->header)) {
+	if (pkt_get_crc1(pkt) != pkt_compute_crc1(pkt))
 		return E_CRC;
-	}
 
+	// No-op if payload empty
 	memcpy(pkt->payload, data + read, payload_size);
 	read += payload_size;
 
+	// Prevent memcpy from overflowing
 	if (payload_size > 0) {
 		memcpy(&pkt->crc2, data + read, sizeof (pkt->crc2));
-		uint32_t computed_crc2 = crc32(0, (unsigned char *) pkt->payload, payload_size);
-		if (pkt_get_crc2(pkt) != computed_crc2) {
+		if (pkt_get_crc2(pkt) != pkt_compute_crc2(pkt, payload_size))
 			return E_CRC;
-		}
 	}
 
 	return PKT_OK;
@@ -127,7 +139,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
 	written += sizeof (*pkt->header);
 
-	uint32_t header_crc = htonl(compute_header_crc32(pkt->header));
+	uint32_t header_crc = htonl(pkt_compute_crc1(pkt));
 	memcpy(buf + written, &header_crc, sizeof (header_crc));
 	written += sizeof (header_crc);
 
@@ -135,7 +147,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	written += payload_size;
 
 	if (payload_size > 0) {
-		uint32_t payload_crc = htonl(crc32(0, (unsigned char *) pkt->payload, payload_size));
+		uint32_t payload_crc = htonl(pkt_compute_crc2(pkt, payload_size));
 		memcpy(buf + written, &payload_crc, sizeof (payload_crc));
 		written += sizeof (payload_crc);
 	}
