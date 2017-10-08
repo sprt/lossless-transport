@@ -164,6 +164,16 @@ void test_pkt_decode(void) {
 	CU_ASSERT_NSTRING_EQUAL(pkt_get_payload(pkt), hello_world, strlen(hello_world));
 }
 
+void test_pkt_decode_len(void) {
+	char buf[MAX_PACKET_SIZE] = {0};
+
+	// Test it returns E_NOHEADER with an empty buffer
+	size_t n = MAX_PACKET_SIZE;
+	CU_ASSERT_EQUAL(pkt_encode(pkt, buf, &n), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_decode(NULL, MAX_PACKET_SIZE, pkt), E_NOHEADER);
+	CU_ASSERT_EQUAL(pkt_decode(buf, 0, pkt), E_NOHEADER);
+}
+
 void test_pkt_encode_decode(void) {
 	char encoded[BUF_SIZE] = {0};
 	char hello_world[] = "hello world";
@@ -311,6 +321,7 @@ int main(void) {
 		{"pkt_set_payload", test_pkt_set_payload},
 		{"pkt_set_crc2", test_pkt_set_crc2},
 		{"pkt_decode", test_pkt_decode},
+		{"pkt_decode_len", test_pkt_decode_len},
 		{"pkt_encode_decode", test_pkt_encode_decode},
 		{"pkt_encode_tr0", test_pkt_encode_tr0},
 		{"pkt_encode_tr1", test_pkt_encode_tr1},

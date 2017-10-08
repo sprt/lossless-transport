@@ -66,7 +66,7 @@ uint32_t compute_header_crc32(const struct header *h) {
 
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	size_t header_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	if (len < header_size) {
+	if (data == NULL || len < header_size) {
 		return E_NOHEADER;
 	}
 
