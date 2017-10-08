@@ -81,10 +81,11 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	//if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_length(pkt) != 0) return E_UNCONSISTENT;
 	if (pkt_get_length(pkt) > MAX_PAYLOAD_SIZE) return E_LENGTH;
 
-	// If there's no payload, the packet should only be big enough to
-	// fit the header.
 	uint16_t length = pkt_get_length(pkt);
-	if (length == 0 && len > header_size) {
+	size_t payload_size = length * sizeof (*pkt->payload);
+	size_t total_size = header_size + payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
+
+	if (len != total_size) {
 		return E_UNCONSISTENT;
 	}
 
@@ -95,7 +96,6 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 		return E_CRC;
 	}
 
-	size_t payload_size = length * sizeof (*pkt->payload);
 	memcpy(pkt->payload, data + read, payload_size);
 	read += payload_size;
 
@@ -114,10 +114,10 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	uint16_t length = pkt_get_length(pkt);
 	size_t payload_size = length * sizeof (*pkt->payload);
 
-	size_t tot_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	tot_size += payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
+	size_t total_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
+	total_size += payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
 
-	if (tot_size > *len) {
+	if (total_size > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}

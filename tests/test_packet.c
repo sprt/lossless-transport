@@ -3,6 +3,7 @@
 
 #include "../src/packet_interface.h"
 
+#define MAX_PACKET_SIZE 1 + 1 + 2 + 4 + 4 + MAX_PAYLOAD_SIZE + 4
 #define BUF_SIZE 1024
 
 static pkt_t *pkt = NULL;
@@ -172,6 +173,20 @@ void test_pkt_decode_len(void) {
 	CU_ASSERT_EQUAL(pkt_encode(pkt, buf, &n), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_decode(NULL, MAX_PACKET_SIZE, pkt), E_NOHEADER);
 	CU_ASSERT_EQUAL(pkt_decode(buf, 0, pkt), E_NOHEADER);
+
+	// Test it returns E_UNCONSISTENT if the buffer is less than the size of
+	// the packet (indicated by the Length field)
+	n = MAX_PACKET_SIZE;
+	CU_ASSERT_EQUAL(pkt_set_length(pkt, MAX_PAYLOAD_SIZE), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_encode(pkt, buf, &n), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_decode(buf, MAX_PACKET_SIZE - 1, pkt), E_UNCONSISTENT);
+
+	// Test it returns E_UNCONSISTENT if the buffer is greater than the size
+	// of the packet (indicated by the Length field)
+	n = MAX_PACKET_SIZE - 1;
+	CU_ASSERT_EQUAL(pkt_set_length(pkt, MAX_PAYLOAD_SIZE - 1), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_encode(pkt, buf, &n), PKT_OK);
+	CU_ASSERT_EQUAL(pkt_decode(buf, MAX_PACKET_SIZE, pkt), E_UNCONSISTENT);
 }
 
 void test_pkt_encode_decode(void) {
