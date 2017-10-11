@@ -3,8 +3,6 @@
 
 #include "../src/packet_interface.h"
 
-#define MAX_PACKET_SIZE 1 + 1 + 2 + 4 + 4 + MAX_PAYLOAD_SIZE + 4
-
 static pkt_t *pkt = NULL;
 
 void pkt_setup(void) {
@@ -72,6 +70,8 @@ void test_pkt_set_seqnum(void) {
 }
 
 void test_pkt_set_length(void) {
+	// TODO: test payload zeroed out
+
 	CU_ASSERT_EQUAL(pkt_set_length(pkt, MAX_PAYLOAD_SIZE), PKT_OK);
 	CU_ASSERT_EQUAL(pkt_get_length(pkt), MAX_PAYLOAD_SIZE);
 
@@ -339,45 +339,25 @@ void test_pkt_encode_computes_crc1_with_tr0(void) {
 	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, crc, sizeof (uint32_t));
 }
 
-int main(void) {
-	if (CU_initialize_registry() != CUE_SUCCESS) {
-		return CU_get_error();
-	}
-
-	CU_TestInfo packet_tests[] = {
-		{"pkt_new", test_pkt_new},
-		{"pkt_set_type", test_pkt_set_type},
-		{"pkt_set_tr", test_pkt_set_tr},
-		{"pkt_set_window", test_pkt_set_window},
-		{"pkt_set_seqnum", test_pkt_set_seqnum},
-		{"pkt_set_length", test_pkt_set_length},
-		{"pkt_get_length", test_pkt_set_length},
-		{"pkt_set_timestamp", test_pkt_set_timestamp},
-		{"pkt_set_crc1", test_pkt_set_crc1},
-		{"pkt_set_payload", test_pkt_set_payload},
-		{"pkt_set_crc2", test_pkt_set_crc2},
-		{"pkt_decode", test_pkt_decode},
-		{"pkt_decode_no_payload", test_pkt_decode_no_payload},
-		{"pkt_decode_len", test_pkt_decode_len},
-		{"pkt_encode_decode", test_pkt_encode_decode},
-		{"pkt_encode_tr0", test_pkt_encode_tr0},
-		{"pkt_encode_tr1", test_pkt_encode_tr1},
-		{"pkt_encode_length0", test_pkt_encode_length0},
-		{"pkt_encode_computes_crc1_with_tr0", test_pkt_encode_computes_crc1_with_tr0},
-		CU_TEST_INFO_NULL,
-	};
-
-	CU_SuiteInfo suites[] = {
-		{"packet", NULL, NULL, pkt_setup, pkt_teardown, packet_tests},
-		CU_SUITE_INFO_NULL,
-	};
-
-	if (CU_register_suites(suites) != CUE_SUCCESS) {
-		return CU_get_error();
-	}
-
-	CU_basic_run_tests();
-	CU_cleanup_registry();
-
-	return CU_get_error();
-}
+CU_TestInfo packet_tests[] = {
+	{"pkt_new", test_pkt_new},
+	{"pkt_set_type", test_pkt_set_type},
+	{"pkt_set_tr", test_pkt_set_tr},
+	{"pkt_set_window", test_pkt_set_window},
+	{"pkt_set_seqnum", test_pkt_set_seqnum},
+	{"pkt_set_length", test_pkt_set_length},
+	{"pkt_get_length", test_pkt_set_length},
+	{"pkt_set_timestamp", test_pkt_set_timestamp},
+	{"pkt_set_crc1", test_pkt_set_crc1},
+	{"pkt_set_payload", test_pkt_set_payload},
+	{"pkt_set_crc2", test_pkt_set_crc2},
+	{"pkt_decode", test_pkt_decode},
+	{"pkt_decode_no_payload", test_pkt_decode_no_payload},
+	{"pkt_decode_len", test_pkt_decode_len},
+	{"pkt_encode_decode", test_pkt_encode_decode},
+	{"pkt_encode_tr0", test_pkt_encode_tr0},
+	{"pkt_encode_tr1", test_pkt_encode_tr1},
+	{"pkt_encode_length0", test_pkt_encode_length0},
+	{"pkt_encode_computes_crc1_with_tr0", test_pkt_encode_computes_crc1_with_tr0},
+	CU_TEST_INFO_NULL,
+};
