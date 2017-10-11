@@ -25,7 +25,7 @@ void teardown_queue_test(void) {
 	p = NULL;
 }
 
-void test_queue_add_remove(void) {
+void test_queue_add_then_remove(void) {
 	// We should be able to add only up to QUEUE_MAXSIZE elements
 	for (size_t i = 0; i < QUEUE_MAXSIZE; i++) {
 		CU_ASSERT_NOT_EQUAL(queue_add(q, p), -1);
@@ -43,7 +43,20 @@ void test_queue_add_remove(void) {
 	CU_ASSERT_PTR_NULL(queue_remove(q));
 }
 
+void test_queue_add_remove_interlaced(void) {
+	CU_ASSERT_NOT_EQUAL(queue_add(q, p), -1); // 1
+	CU_ASSERT_NOT_EQUAL(queue_add(q, p), -1); // 2
+	CU_ASSERT_PTR_NOT_NULL(queue_remove(q)); // 1
+	CU_ASSERT_NOT_EQUAL(queue_add(q, p), -1); // 2
+	CU_ASSERT_PTR_NOT_NULL(queue_remove(q)); // 1
+	CU_ASSERT_NOT_EQUAL(queue_add(q, p), -1); // 2
+	CU_ASSERT_PTR_NOT_NULL(queue_remove(q)); // 1
+	CU_ASSERT_PTR_NOT_NULL(queue_remove(q)); // 0
+	CU_ASSERT_PTR_NULL(queue_remove(q));
+}
+
 CU_TestInfo queue_tests[] = {
-	{"queue_add_remove", test_queue_add_remove},
+	{"queue_add_then_remove", test_queue_add_then_remove},
+	{"queue_add_remove_interlaced", test_queue_add_remove_interlaced},
 	CU_TEST_INFO_NULL,
 };
