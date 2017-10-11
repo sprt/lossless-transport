@@ -5,6 +5,8 @@
 #include <stddef.h> /* size_t */
 #include <stdint.h> /* uintx_t */
 
+#define MAX_PACKET_SIZE 1 + 1 + 2 + 4 + 4 + MAX_PAYLOAD_SIZE + 4
+
 /* Raccourci pour struct pkt */
 typedef struct pkt pkt_t;
 
@@ -51,7 +53,7 @@ void pkt_del(pkt_t*);
  * - Le CRC32 du header recu est le même que celui decode a la fin
  *   du header (en considerant le champ TR a 0)
  * - S'il est present, le CRC32 du payload recu est le meme que celui
- *   decode a la fin du payload 
+ *   decode a la fin du payload
  * - Le type du paquet est valide
  * - La longueur du paquet et le champ TR sont valides et coherents
  *   avec le nombre d'octets recus.
