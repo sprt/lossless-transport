@@ -19,7 +19,6 @@ struct __attribute__((__packed__)) header {
 struct __attribute__((__packed__)) pkt {
 	struct header *header;
 	uint32_t crc1;
-
 	char payload[MAX_PAYLOAD_SIZE];
 	uint32_t crc2;
 };
@@ -44,6 +43,7 @@ pkt_t* pkt_new() {
 	pkt->header->timestamp = 0;
 	pkt->crc1 = 0;
 
+	// Zero out unused slots; makes debugging easier
 	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
 	pkt->crc2 = 0;
 
@@ -59,6 +59,7 @@ void pkt_del(pkt_t *pkt) {
  * Computes the CRC32 of the header with its TR field set to 0.
  */
 uint32_t pkt_compute_crc1(const pkt_t *pkt) {
+	// Copy the header and set the TR of that copy
 	struct header h = *pkt->header;
 	h.tr = 0;
 	return crc32(0, (unsigned char *) &h, sizeof (h));
@@ -73,40 +74,43 @@ uint32_t pkt_compute_crc2(const pkt_t *pkt, size_t len) {
 
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	size_t header_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	if (data == NULL || len < header_size)
+	if (data == NULL || len < header_size) {
 		return E_NOHEADER;
+	}
 
 	size_t read = 0;
 
 	memcpy(pkt->header, data + read, sizeof (*pkt->header));
 	read += sizeof (*pkt->header);
 
+	// The packet includes the CRC2 field iff it has a payload and it wasn't
+	// truncated. pkt_get_length returns 0 if it was truncated so we're all set.
 	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
 	size_t total_size = header_size + payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
 
 	// Field errors should be returned in the order those fields are
-	// declared in the struct
-	if (pkt_get_type(pkt) == 0)
+	// declared in the struct. We could return E_UNCONSISTENT if the packet
+	// has a payload and isn't of type PTYPE_DATA, but we don't since it
+	// isn't specified and thus doing so might break other implementations
+	// (albeit buggy ones).
+	if (pkt_get_type(pkt) == 0) {
 		return E_TYPE;
-	if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_tr(pkt) != 0)
+	} else if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_tr(pkt) != 0) {
 		return E_TR;
-	if (pkt_get_window(pkt) > MAX_WINDOW_SIZE)
+	} else if (pkt_get_window(pkt) > MAX_WINDOW_SIZE) {
 		return E_WINDOW;
-	if (payload_size > MAX_PAYLOAD_SIZE)
+	} else if (payload_size > MAX_PAYLOAD_SIZE) {
 		return E_LENGTH;
-	// if (pkt_get_type(pkt) != PTYPE_DATA && payload_size != 0)
-	// 	// Not in the spec but makes sense, yet dangerous as it could
-	// 	// break other implementations
-	// 	return E_UNCONSISTENT;
-	if (len != total_size)
-		// Important to return now in order to prevent a potential
-		// overflow
+	} else if (len != total_size) {
+		// Return now in order to prevent a potential buffer overflow
 		return E_UNCONSISTENT;
+	}
 
 	memcpy(&pkt->crc1, data + read, sizeof (pkt->crc1));
 	read += sizeof (pkt->crc1);
-	if (pkt_get_crc1(pkt) != pkt_compute_crc1(pkt))
+	if (pkt_get_crc1(pkt) != pkt_compute_crc1(pkt)) {
 		return E_CRC;
+	}
 
 	// No-op if payload empty
 	memcpy(pkt->payload, data + read, payload_size);
@@ -115,8 +119,9 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	// Prevent memcpy from overflowing
 	if (payload_size > 0) {
 		memcpy(&pkt->crc2, data + read, sizeof (pkt->crc2));
-		if (pkt_get_crc2(pkt) != pkt_compute_crc2(pkt, payload_size))
+		if (pkt_get_crc2(pkt) != pkt_compute_crc2(pkt, payload_size)) {
 			return E_CRC;
+		}
 	}
 
 	return PKT_OK;
@@ -143,6 +148,7 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	memcpy(buf + written, &crc1, sizeof (crc1));
 	written += sizeof (crc1);
 
+	// No-op if payload empty
 	memcpy(buf + written, pkt->payload, payload_size);
 	written += payload_size;
 
@@ -241,6 +247,11 @@ pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length) {
 	if (length > MAX_PAYLOAD_SIZE) {
 		return E_LENGTH;
 	}
+
+	// Maintain the invariant that unused slots are zeroed out
+	uint16_t unused = (MAX_PAYLOAD_SIZE - length) * sizeof (*pkt->payload);
+	memset(pkt->payload + length, 0, unused);
+
 	pkt->header->length = htons(length);
 	return PKT_OK;
 }
@@ -271,7 +282,6 @@ pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t len
 		return code;
 	}
 
-	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
 	memcpy(pkt->payload, data, actual);
 	return PKT_OK;
 }
