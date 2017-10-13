@@ -49,6 +49,18 @@ uint32_t pkt_compute_crc2(const pkt_t *pkt, size_t len) {
 	return crc32(0, (unsigned char *) pkt->payload, len);
 }
 
+/**
+ * Returns the total size of a packet on the wire.
+ */
+size_t pkt_get_total_size(const pkt_t *pkt) {
+	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
+	size_t total_size = HEADER_SIZE + payload_size;
+	if (payload_size > 0) {
+		total_size += sizeof (pkt->crc2);
+	}
+	return total_size;
+}
+
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	if (data == NULL || len < HEADER_SIZE) {
 		return E_NOHEADER;
@@ -59,10 +71,7 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	memcpy(pkt, data + read, HEADER_SIZE);
 	read += HEADER_SIZE;
 
-	// The packet includes the CRC2 field iff it has a payload and it wasn't
-	// truncated. pkt_get_length returns 0 if it was truncated so we're all set.
 	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
-	size_t total_size = HEADER_SIZE + payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
 
 	// Field errors should be returned in the order those fields are
 	// declared in the struct. We could return E_UNCONSISTENT if the packet
@@ -77,7 +86,7 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 		return E_WINDOW;
 	} else if (payload_size > MAX_PAYLOAD_SIZE) {
 		return E_LENGTH;
-	} else if (len != total_size) {
+	} else if (len != pkt_get_total_size(pkt)) {
 		// Return now in order to prevent a potential buffer overflow
 		return E_UNCONSISTENT;
 	} else if (pkt_get_crc1(pkt) != pkt_compute_crc1(pkt)) {
