@@ -7,51 +7,28 @@
 
 #include "packet_interface.h"
 
-struct __attribute__((__packed__)) header {
+struct __attribute__((__packed__)) pkt {
 	unsigned int window : 5;
 	unsigned int tr : 1;
 	unsigned int type : 2;
 	uint8_t seqnum;
 	uint16_t length;
 	uint32_t timestamp;
-};
-
-struct __attribute__((__packed__)) pkt {
-	struct header *header;
 	uint32_t crc1;
 	char payload[MAX_PAYLOAD_SIZE];
 	uint32_t crc2;
 };
 
 pkt_t* pkt_new() {
-	pkt_t *pkt = malloc(sizeof (pkt_t));
+	pkt_t *pkt = calloc(1, sizeof (pkt_t));
 	if (pkt == NULL) {
 		return NULL;
 	}
-
-	pkt->header = malloc(sizeof (*pkt->header));
-	if (pkt->header == NULL) {
-		pkt_del(pkt);
-		return NULL;
-	}
-
-	pkt->header->type = PTYPE_DATA;
-	pkt->header->tr = 0;
-	pkt->header->window = 0;
-	pkt->header->seqnum = 0;
-	pkt->header->length = 0;
-	pkt->header->timestamp = 0;
-	pkt->crc1 = 0;
-
-	// Zero out unused slots; makes debugging easier
-	memset(pkt->payload, 0, MAX_PAYLOAD_SIZE * sizeof (*pkt->payload));
-	pkt->crc2 = 0;
-
+	pkt->type = PTYPE_DATA;
 	return pkt;
 }
 
 void pkt_del(pkt_t *pkt) {
-	free(pkt->header);
 	free(pkt);
 }
 
@@ -59,10 +36,10 @@ void pkt_del(pkt_t *pkt) {
  * Computes the CRC32 of the header with its TR field set to 0.
  */
 uint32_t pkt_compute_crc1(const pkt_t *pkt) {
-	// Copy the header and set the TR of that copy
-	struct header h = *pkt->header;
-	h.tr = 0;
-	return crc32(0, (unsigned char *) &h, sizeof (h));
+	// Copy the packet and set the TR of that copy
+	pkt_t p = *pkt;
+	p.tr = 0;
+	return crc32(0, (unsigned char *) &p, HEADER_SIZE - sizeof (pkt->crc1));
 }
 
 /**
@@ -73,20 +50,19 @@ uint32_t pkt_compute_crc2(const pkt_t *pkt, size_t len) {
 }
 
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
-	size_t header_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	if (data == NULL || len < header_size) {
+	if (data == NULL || len < HEADER_SIZE) {
 		return E_NOHEADER;
 	}
 
 	size_t read = 0;
 
-	memcpy(pkt->header, data + read, sizeof (*pkt->header));
-	read += sizeof (*pkt->header);
+	memcpy(pkt, data + read, HEADER_SIZE);
+	read += HEADER_SIZE;
 
 	// The packet includes the CRC2 field iff it has a payload and it wasn't
 	// truncated. pkt_get_length returns 0 if it was truncated so we're all set.
 	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
-	size_t total_size = header_size + payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
+	size_t total_size = HEADER_SIZE + payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
 
 	// Field errors should be returned in the order those fields are
 	// declared in the struct. We could return E_UNCONSISTENT if the packet
@@ -104,11 +80,7 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	} else if (len != total_size) {
 		// Return now in order to prevent a potential buffer overflow
 		return E_UNCONSISTENT;
-	}
-
-	memcpy(&pkt->crc1, data + read, sizeof (pkt->crc1));
-	read += sizeof (pkt->crc1);
-	if (pkt_get_crc1(pkt) != pkt_compute_crc1(pkt)) {
+	} else if (pkt_get_crc1(pkt) != pkt_compute_crc1(pkt)) {
 		return E_CRC;
 	}
 
@@ -128,27 +100,22 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 }
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
-	uint16_t length = pkt_get_length(pkt);
-	size_t payload_size = length * sizeof (*pkt->payload);
-
-	size_t total_size = sizeof (*pkt->header) + sizeof (pkt->crc1);
-	total_size += payload_size + ((payload_size > 0) ? sizeof (pkt->crc2) : 0);
-
-	if (total_size > *len) {
+	if (pkt_get_total_size(pkt) > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}
 
 	size_t written = 0;
 
-	memcpy(buf + written, pkt->header, sizeof (*pkt->header));
-	written += sizeof (*pkt->header);
+	memcpy(buf + written, pkt, HEADER_SIZE - sizeof (pkt->crc1));
+	written += HEADER_SIZE - sizeof (pkt->crc1);
 
 	uint32_t crc1 = htonl(pkt_compute_crc1(pkt));
 	memcpy(buf + written, &crc1, sizeof (crc1));
 	written += sizeof (crc1);
 
 	// No-op if payload empty
+	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
 	memcpy(buf + written, pkt->payload, payload_size);
 	written += payload_size;
 
@@ -168,30 +135,30 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
  */
 
 ptypes_t pkt_get_type(const pkt_t* pkt) {
-	return (ptypes_t) pkt->header->type;
+	return (ptypes_t) pkt->type;
 }
 
 uint8_t pkt_get_tr(const pkt_t* pkt) {
-	return (uint8_t) pkt->header->tr;
+	return (uint8_t) pkt->tr;
 }
 
 uint8_t pkt_get_window(const pkt_t* pkt) {
-	return (uint8_t) pkt->header->window;
+	return (uint8_t) pkt->window;
 }
 
 uint8_t pkt_get_seqnum(const pkt_t* pkt) {
-	return (uint8_t) pkt->header->seqnum;
+	return (uint8_t) pkt->seqnum;
 }
 
 uint16_t pkt_get_length(const pkt_t* pkt) {
 	if (pkt_get_tr(pkt)) {
 		return 0;
 	}
-	return ntohs(pkt->header->length);
+	return ntohs(pkt->length);
 }
 
 uint32_t pkt_get_timestamp(const pkt_t* pkt) {
-	return pkt->header->timestamp;
+	return pkt->timestamp;
 }
 
 uint32_t pkt_get_crc1(const pkt_t* pkt) {
@@ -218,7 +185,7 @@ pkt_status_code pkt_set_type(pkt_t *pkt, const ptypes_t type) {
 	if (type == 0 || type >> 2) {
 		return E_TYPE;
 	}
-	pkt->header->type = type;
+	pkt->type = type;
 	return PKT_OK;
 }
 
@@ -226,7 +193,7 @@ pkt_status_code pkt_set_tr(pkt_t *pkt, const uint8_t tr) {
 	if (tr >> 1) {
 		return E_TR;
 	}
-	pkt->header->tr = tr;
+	pkt->tr = tr;
 	return PKT_OK;
 }
 
@@ -234,12 +201,12 @@ pkt_status_code pkt_set_window(pkt_t *pkt, const uint8_t window) {
 	if (window > MAX_WINDOW_SIZE) {
 		return E_WINDOW;
 	}
-	pkt->header->window = window;
+	pkt->window = window;
 	return PKT_OK;
 }
 
 pkt_status_code pkt_set_seqnum(pkt_t *pkt, const uint8_t seqnum) {
-	pkt->header->seqnum = seqnum;
+	pkt->seqnum = seqnum;
 	return PKT_OK;
 }
 
@@ -252,12 +219,12 @@ pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length) {
 	uint16_t unused = (MAX_PAYLOAD_SIZE - length) * sizeof (*pkt->payload);
 	memset(pkt->payload + length, 0, unused);
 
-	pkt->header->length = htons(length);
+	pkt->length = htons(length);
 	return PKT_OK;
 }
 
 pkt_status_code pkt_set_timestamp(pkt_t *pkt, const uint32_t timestamp) {
-	pkt->header->timestamp = timestamp;
+	pkt->timestamp = timestamp;
 	return PKT_OK;
 }
 

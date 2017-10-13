@@ -5,7 +5,8 @@
 #include <stddef.h> /* size_t */
 #include <stdint.h> /* uintx_t */
 
-#define MAX_PACKET_SIZE 1 + 1 + 2 + 4 + 4 + MAX_PAYLOAD_SIZE + 4
+#define HEADER_SIZE 1 + 1 + 2 + 4 + 4
+#define MAX_PACKET_SIZE HEADER_SIZE + MAX_PAYLOAD_SIZE + 4
 
 /* Raccourci pour struct pkt */
 typedef struct pkt pkt_t;
