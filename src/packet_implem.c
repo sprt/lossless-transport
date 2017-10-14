@@ -109,29 +109,26 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 }
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
-	if (pkt_get_total_size(pkt) > *len) {
+	pkt_t p = *pkt;
+	size_t total_size = pkt_get_total_size(&p);
+	size_t payload_size = pkt_get_length(&p) * sizeof (*p.payload);
+
+	if (total_size > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}
 
+	pkt_set_crc1(&p, pkt_compute_crc1(&p));
+	pkt_set_crc2(&p, pkt_compute_crc2(&p, payload_size));
+
 	size_t written = 0;
 
-	memcpy(buf + written, pkt, HEADER_SIZE - sizeof (pkt->crc1));
-	written += HEADER_SIZE - sizeof (pkt->crc1);
-
-	uint32_t crc1 = htonl(pkt_compute_crc1(pkt));
-	memcpy(buf + written, &crc1, sizeof (crc1));
-	written += sizeof (crc1);
-
-	// No-op if payload empty
-	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
-	memcpy(buf + written, pkt->payload, payload_size);
-	written += payload_size;
+	memcpy(buf + written, &p, HEADER_SIZE + payload_size);
+	written += HEADER_SIZE + payload_size;
 
 	if (payload_size > 0) {
-		uint32_t crc2 = htonl(pkt_compute_crc2(pkt, payload_size));
-		memcpy(buf + written, &crc2, sizeof (crc2));
-		written += sizeof (crc2);
+		memcpy(buf + written, &p.crc2, sizeof (p.crc2));
+		written += sizeof (p.crc2);
 	}
 
 	*len = written;
