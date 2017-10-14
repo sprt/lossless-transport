@@ -20,12 +20,7 @@ struct __attribute__((__packed__)) pkt {
 };
 
 pkt_t* pkt_new() {
-	pkt_t *pkt = calloc(1, sizeof (pkt_t));
-	if (pkt == NULL) {
-		return NULL;
-	}
-	pkt->type = PTYPE_DATA;
-	return pkt;
+	return calloc(1, sizeof (pkt_t));
 }
 
 void pkt_del(pkt_t *pkt) {
@@ -110,19 +105,21 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	pkt_t p = *pkt;
-	size_t total_size = pkt_get_total_size(&p);
-	size_t payload_size = pkt_get_length(&p) * sizeof (*p.payload);
+	if (pkt_get_type(&p) == 0) {
+		return E_TYPE;
+	}
 
+	size_t total_size = pkt_get_total_size(&p);
 	if (total_size > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}
 
+	size_t payload_size = pkt_get_length(&p) * sizeof (*p.payload);
 	pkt_set_crc1(&p, pkt_compute_crc1(&p));
 	pkt_set_crc2(&p, pkt_compute_crc2(&p, payload_size));
 
 	size_t written = 0;
-
 	memcpy(buf + written, &p, HEADER_SIZE + payload_size);
 	written += HEADER_SIZE + payload_size;
 

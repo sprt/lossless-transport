@@ -17,7 +17,7 @@ void pkt_teardown(void) {
 
 void test_pkt_new(void) {
 	CU_ASSERT_PTR_NOT_NULL_FATAL(pkt);
-	CU_ASSERT_EQUAL(pkt_get_type(pkt), PTYPE_DATA);
+	CU_ASSERT_EQUAL(pkt_get_type(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_tr(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_window(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_seqnum(pkt), 0);
@@ -187,6 +187,8 @@ void test_pkt_decode_no_payload(void) {
 }
 
 void test_pkt_decode_len(void) {
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
+
 	char buf[MAX_PACKET_SIZE] = {0};
 
 	// Test it returns E_NOHEADER with an empty buffer
@@ -319,6 +321,8 @@ void test_pkt_encode_length0(void) {
 }
 
 void test_pkt_encode_computes_crc1_with_tr0(void) {
+	CU_ASSERT_EQUAL(pkt_set_type(pkt, PTYPE_DATA), PKT_OK);
+
 	char buf_tr0[MAX_PACKET_SIZE] = {0};
 	size_t n_tr0 = MAX_PACKET_SIZE;
 	CU_ASSERT_EQUAL(pkt_encode(pkt, buf_tr0, &n_tr0), PKT_OK);
@@ -337,6 +341,14 @@ void test_pkt_encode_computes_crc1_with_tr0(void) {
 	// Test CRCs are correct and stored in network byte order
 	unsigned char crc[] = {0x4c, 0xbf, 0x1d, 0x84};
 	CU_ASSERT_NSTRING_EQUAL(buf_tr0 + offset, crc, sizeof (uint32_t));
+}
+
+void test_pkt_encode_empty(void) {
+	// Test the default packet isn't encodable (as pkt_new doesn't set a
+	// valid type)
+	char buf[MAX_PACKET_SIZE];
+	size_t len = MAX_PACKET_SIZE;
+	CU_ASSERT_EQUAL(pkt_encode(pkt, buf, &len), E_TYPE);
 }
 
 CU_TestInfo packet_tests[] = {
@@ -359,5 +371,6 @@ CU_TestInfo packet_tests[] = {
 	{"pkt_encode_tr1", test_pkt_encode_tr1},
 	{"pkt_encode_length0", test_pkt_encode_length0},
 	{"pkt_encode_computes_crc1_with_tr0", test_pkt_encode_computes_crc1_with_tr0},
+	{"pkt_encode_empty", test_pkt_encode_empty},
 	CU_TEST_INFO_NULL,
 };
