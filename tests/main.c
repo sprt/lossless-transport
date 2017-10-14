@@ -2,7 +2,7 @@
 #include "CUnit/Basic.h"
 
 #include "test_packet.h"
-#include "test_queue.h"
+#include "test_minqueue.h"
 
 int main(void) {
 	if (CU_initialize_registry() != CUE_SUCCESS) {

@@ -17,7 +17,7 @@ default: sender receiver
 
 tests: LDFLAGS += -lcunit
 tests: SRCS += src/packet_implem.c
-tests: SRCS += src/queue.c
+tests: SRCS += src/minqueue.c
 tests: SRCS += tests/main.c
 tests:
 	@rm -f test
