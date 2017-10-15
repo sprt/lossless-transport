@@ -24,14 +24,10 @@ minqueue_t *queue_create(size_t max_size) {
 	return q;
 }
 
-int pkt_cmp(pkt_t *a, pkt_t *b) {
-	return pkt_get_timestamp(b) - pkt_get_timestamp(a);
-}
-
-int pkt_qcmp(const void *a, const void *b) {
+int pkt_cmp(const void *a, const void *b) {
 	pkt_t *pkt_a = *((pkt_t **) a);
 	pkt_t *pkt_b = *((pkt_t **) b);
-	return pkt_cmp(pkt_a, pkt_b);
+	return pkt_get_timestamp(pkt_b) - pkt_get_timestamp(pkt_a);
 }
 
 inline void swap(pkt_t **arr, size_t i, size_t j) {
@@ -46,7 +42,7 @@ int queue_push(minqueue_t *q, pkt_t *pkt) {
 	}
 	size_t pos = q->size;
 	q->arr[pos] = (pkt_t *) pkt;
-	for (; pos > 0 && pkt_cmp(q->arr[pos - 1], q->arr[pos]) > 0; pos--) {
+	for (; pos > 0 && pkt_cmp(&q->arr[pos - 1], &q->arr[pos]) > 0; pos--) {
 		swap(q->arr, pos - 1, pos);
 	}
 	q->size++;
@@ -64,7 +60,7 @@ int queue_update(minqueue_t *q, uint8_t seqnum, uint32_t timestamp) {
 	for (size_t i = 0; i < q->size; i++) {
 		if (pkt_get_seqnum(q->arr[i]) == seqnum) {
 			pkt_set_timestamp(q->arr[i], timestamp);
-			qsort(q->arr, q->size, sizeof (*q->arr), pkt_qcmp);
+			qsort(q->arr, q->size, sizeof (*q->arr), pkt_cmp);
 			return 0;
 		}
 	}
