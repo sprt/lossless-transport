@@ -1,5 +1,5 @@
-#ifndef __QUEUE_H_
-#define __QUEUE_H_
+#ifndef __MINQUEUE_H_
+#define __MINQUEUE_H_
 
 
 #include <stddef.h>
@@ -49,4 +49,4 @@ pkt_t *queue_pop(minqueue_t *q);
 void queue_free(minqueue_t *q);
 
 
-#endif  /* __QUEUE_H_ */
+#endif  /* __MINQUEUE_H_ */
