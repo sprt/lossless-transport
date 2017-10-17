@@ -140,17 +140,25 @@ static void read_write_loop(int sockfd) {
 				continue;
 			}
 
-			pkt_t *pkt = pkt_new();
-			pkt_set_type(pkt, PTYPE_DATA);
-			pkt_set_seqnum(pkt, 10);
-			pkt_set_window(pkt, 0); /* sender has no receiving window */
-			pkt_set_timestamp(pkt, get_monotime() + TIMER);
-			pkt_set_payload(pkt, buf, len);
 			char pkt_raw[MAX_PACKET_SIZE] = {0};
 			size_t pkt_len = MAX_PACKET_SIZE;
-			pkt_status_code code = pkt_encode(pkt, pkt_raw, &pkt_len);
-			if (code != PKT_OK) {
-				exit_msg("pkt_encode: %d\n", code);
+
+			pkt_t *pkt = pkt_new();
+			if (pkt == NULL) {
+				exit_msg("Error creating packet\n");
+			}
+
+			pkt_status_code err = PKT_OK;
+			err = err || pkt_set_type(pkt, PTYPE_DATA);
+			err = err || pkt_set_seqnum(pkt, 10);
+			/* The sender has no receiving window */
+			err = err || pkt_set_window(pkt, 0);
+			err = err || pkt_set_timestamp(pkt, get_monotime() + TIMER);
+			err = err || pkt_set_payload(pkt, buf, len);
+			err = err || pkt_encode(pkt, pkt_raw, &pkt_len);
+
+			if (err != PKT_OK) {
+				exit_msg("Error creating packet: %d\n", err);
 			}
 
 			if (send(sockfd, pkt_raw, pkt_len, 0) == -1) {
