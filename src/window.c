@@ -65,6 +65,10 @@ int window_resize(window_t *w, size_t new_size) {
 	return 0;
 }
 
+size_t window_get_size(window_t *w) {
+	return w->size;
+}
+
 int window_push(window_t *w, pkt_t *pkt) {
 	if (window_full(w)) {
 		return -1;
@@ -149,7 +153,6 @@ pkt_t *window_pop_node(window_t *w, struct node **node) {
 	// Special case: exactly one element
 	if (w->front->next == NULL) {
 		free(w->front);
-		free(w->rear);
 		w->front = NULL;
 		w->rear = NULL;
 		w->bufsize = 0;
@@ -171,6 +174,7 @@ struct node *window_find_min_timestamp(window_t *w) {
 		if (min == NULL || pkt_get_timestamp(cur->pkt) < pkt_get_timestamp(min->pkt)) {
 			min = cur;
 		}
+		cur = cur->next;
 	}
 	return min;
 }

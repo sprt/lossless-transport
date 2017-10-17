@@ -76,12 +76,15 @@ static uint32_t get_monotime() {
 /**
  * Returns how long the next call to select should wait (in microseconds).
  * If the buffer is full or EOF has been reached, returns the time until the
- * closest timer expiration. Otherwise, returns zero.
+ * closest timer expiration (no less than zero). Otherwise, returns zero.
  */
 inline static uint32_t get_timeout() {
 	if (window_full(w) || reached_eof) {
 		uint32_t timer = pkt_get_timestamp(window_peek_min_timestamp(w));
-		return timer - get_monotime();
+		uint32_t now = get_monotime();
+		if (timer > now) {
+			return timer - now;
+		}
 	}
 	return 0;
 }
@@ -92,8 +95,21 @@ inline static uint32_t get_timeout() {
 inline static struct timeval micro_to_timeval(uint32_t us) {
 	struct timeval tv;
 	tv.tv_sec = us / 1000000;
-	tv.tv_usec = us % 100000;
+	tv.tv_usec = us % 1000000;
 	return tv;
+}
+
+/**
+ * Sends a packet over the specified socket. Calls send and returns its value.
+ * Exits if the packet couldn't be encoded.
+ */
+int send_packet(int sockfd, pkt_t *pkt) {
+	char buf[MAX_PACKET_SIZE];
+	size_t len = MAX_PACKET_SIZE;
+	if (pkt_encode(pkt, buf, &len) != PKT_OK) {
+		exit_msg("Error encoding packet: %d\n");
+	}
+	return send(sockfd, buf, len, 0);
 }
 
 static void read_write_loop(int sockfd) {
@@ -104,14 +120,15 @@ static void read_write_loop(int sockfd) {
 		FD_SET(sockfd, &read_fds);
 
 		/* If we're done reading and all packets have been acknowledged,
-		 * we can just quit. */
+		 * we can just quit */
 		if (reached_eof && window_empty(w)) {
 			log_msg("Reached EOF and window empty, breaking out\n");
 			break;
 		}
 
-		log_msg("waiting\n");
 		struct timeval timeout = micro_to_timeval(get_timeout());
+		log_msg("select waiting for %lu.%lus\n", timeout.tv_sec, timeout.tv_usec);
+
 		if (select(sockfd + 1, &read_fds, NULL, NULL, &timeout) == -1) {
 			exit_perror("select");
 		}
@@ -124,6 +141,24 @@ static void read_write_loop(int sockfd) {
 				exit_perror("recv");
 			}
 			log_msg("received\n");
+		}
+
+		/* Resend each packet which timer has expired */
+		pkt_t *delayed_pkt;
+		while ((delayed_pkt = window_peek_min_timestamp(w)) != NULL) {
+			uint32_t now = get_monotime();
+			uint32_t pkt_timer = pkt_get_timestamp(delayed_pkt);
+			if (now < pkt_timer) {
+				break;
+			}
+			if (window_update_timestamp(w, pkt_timer, now + TIMER) == -1) {
+				exit_msg("Cannot update timestamp of packet\n");
+			}
+			if (send_packet(sockfd, delayed_pkt) == -1) {
+				exit_perror("send");
+			}
+			log_msg("Resent packet #%03d (time=%d)\n",
+				pkt_get_seqnum(delayed_pkt), pkt_get_timestamp(delayed_pkt));
 		}
 
 		/* If the window isn't full and we still have data to read,
@@ -141,14 +176,10 @@ static void read_write_loop(int sockfd) {
 				continue;
 			}
 
-			char pkt_raw[MAX_PACKET_SIZE] = {0};
-			size_t pkt_len = MAX_PACKET_SIZE;
-
 			pkt_t *pkt = pkt_new();
 			if (pkt == NULL) {
 				exit_msg("Error creating packet\n");
 			}
-
 			pkt_status_code err = PKT_OK;
 			err = err || pkt_set_type(pkt, PTYPE_DATA);
 			err = err || pkt_set_seqnum(pkt, 10);
@@ -156,18 +187,17 @@ static void read_write_loop(int sockfd) {
 			err = err || pkt_set_window(pkt, 0);
 			err = err || pkt_set_timestamp(pkt, get_monotime() + TIMER);
 			err = err || pkt_set_payload(pkt, buf, len);
-			err = err || pkt_encode(pkt, pkt_raw, &pkt_len);
 
-			if (err != PKT_OK) {
-				exit_msg("Error creating packet: %d\n", err);
-			}
-
-			if (send(sockfd, pkt_raw, pkt_len, 0) == -1) {
+			if (send_packet(sockfd, pkt) == -1) {
 				exit_perror("send");
 			}
 
-			log_msg("Sent %3d-byte packet #%03d (time=%d)\n",
-				pkt_len, pkt_get_seqnum(pkt), pkt_get_timestamp(pkt));
+			if (window_push(w, pkt) == -1) {
+				exit_msg("Could not add packet to buffer\n");
+			}
+
+			log_msg("Sent   packet #%03d (time=%d)\n",
+				pkt_get_seqnum(pkt), pkt_get_timestamp(pkt));
 		}
 	}
 }

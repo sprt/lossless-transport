@@ -42,6 +42,11 @@ bool window_has(window_t *w, size_t seqnum);
 int window_resize(window_t *w, size_t new_size);
 
 /**
+ * Returns the size of the window as set by window_create and window_resize.
+ */
+size_t window_get_size(window_t *w);
+
+/**
  * Inserts a packet into the buffer.
  * Returns -1 on error or if the window is full, and 0 otherwise.
  */
