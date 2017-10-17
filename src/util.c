@@ -2,10 +2,32 @@
 #include <getopt.h>
 #include <netdb.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
+
+void log_msg(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+}
+
+void exit_msg(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	exit(1);
+}
+
+void exit_perror(const char *s) {
+	exit_msg("%s: %s\n", s, strerror(errno));
+}
 
 void exit_usage(char **argv) {
 	fprintf(stderr, "Usage: %s <hostname> <port> [-f FILE]\n", argv[0]);
@@ -90,21 +112,52 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
 	return sockfd;
 }
 
-void log_msg(const char *fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
+uint32_t get_monotime(void) {
+	static bool first_call = true; /* whether this is the first call */
+	static struct timeval first; /* unnormalized value returned by the first call */
+	static struct timeval last; /* unnormalized value returned by the last call */
+
+	struct timespec now_tp;
+	if (clock_gettime(CLOCK_MONOTONIC, &now_tp) == -1) {
+		exit_perror("clock_gettime");
+	}
+
+	/* Convert the timespec to a timeval */
+	struct timeval now;
+	now.tv_sec = now_tp.tv_sec;
+	now.tv_usec = now_tp.tv_nsec / 1000;
+
+	if (first_call) {
+		/* Remember the value of the first call to normalize to 0 later */
+		first = now;
+		first_call = false;
+	} else if (timercmp(&now, &last, <) || !timercmp(&now, &last, !=)) {
+		/* Increment if not strictly greater than the last time returned */
+
+		struct timeval us;
+		us.tv_sec = 0;
+		us.tv_usec = 1;
+
+		struct timeval res;
+		timeradd(&last, &us, &res);
+		now = res;
+	}
+
+	/* Save the time we're returning for later calls */
+	last = now;
+
+	/* Normalize to start at 0 */
+	struct timeval res;
+	timersub(&now, &first, &res);
+	now = res;
+
+	/* Convert to microseconds */
+	return now.tv_sec * 1000000 + now.tv_usec;
 }
 
-void exit_msg(const char *fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-	exit(1);
-}
-
-void exit_perror(const char *s) {
-	exit_msg("%s: %s\n", s, strerror(errno));
+struct timeval micro_to_timeval(uint32_t us) {
+	struct timeval tv;
+	tv.tv_sec = us / 1000000;
+	tv.tv_usec = us % 1000000;
+	return tv;
 }

@@ -3,7 +3,7 @@
 
 
 /**
- * Various utility functions used by both sender and receiver.
+ * Various utility functions used by sender and receiver.
  */
 
 #include <stdint.h>
@@ -35,6 +35,21 @@ const char *real_address(const char *address, struct sockaddr_in6 *rval);
  */
 int create_socket(struct sockaddr_in6 *source_addr, int src_port,
                   struct sockaddr_in6 *dest_addr, int dst_port);
+
+/**
+ * Returns the amount of time in microseconds eapsed since an arbitrary point
+ * in time in a STRICTLY monotonic fashion.
+ * The returned values being strictly monotonic is crucial to the correct
+ * identification of ACKs received for out-of-sequence packets, as it relies on
+ * the timestamp field.
+ * The first call returns 0.
+ */
+uint32_t get_monotime(void);
+
+/**
+ * Converts microseconds to a struct timeval.
+ */
+struct timeval micro_to_timeval(uint32_t us);
 
 /**
  * Prints a message on stderr.

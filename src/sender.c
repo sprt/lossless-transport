@@ -19,59 +19,7 @@ static char *filename; /* file we read data from */
 
 static bool reached_eof = false; /* whether we're done reading from the file */
 static window_t *w; /* sending window, buffer contains in-flight packets */
-
-/**
- * Returns the amount of time in microseconds eapsed since an arbitrary point
- * in time in a STRICTLY monotonic fashion.
- * The returned values being strictly monotonic is crucial to the correct
- * identification of ACKs received for out-of-sequence packets, as it relies on
- * the timestamp field.
- * The first call returns 0.
- */
-static uint32_t get_monotime() {
-	static bool first_call = true; /* whether this is the first call */
-	static struct timeval first; /* unnormalized value returned by the first call */
-	static struct timeval last; /* unnormalized value returned by the last call */
-
-	struct timespec now_tp;
-	if (clock_gettime(CLOCK_MONOTONIC, &now_tp) == -1) {
-		exit_perror("clock_gettime");
-	}
-
-	/* Convert the timespec to a timeval */
-	struct timeval now;
-	now.tv_sec = now_tp.tv_sec;
-	now.tv_usec = now_tp.tv_nsec / 1000;
-
-	if (first_call) {
-		/* Remember the value of the first call to normalize to 0 later */
-		first = now;
-		first_call = false;
-	} else if (timercmp(&now, &last, <) || !timercmp(&now, &last, !=)) {
-		/* Increment if not strictly greater than the last time returned */
-
-		struct timeval us;
-		us.tv_sec = 0;
-		us.tv_usec = 1;
-
-		struct timeval res;
-		timeradd(&last, &us, &res);
-		now = res;
-	}
-
-	/* Save the time we're returning for later calls */
-	last = now;
-
-	/* Normalize to start at 0 */
-	struct timeval res;
-	timersub(&now, &first, &res);
-	now = res;
-
-	/* Convert to microseconds */
-	uint32_t now_ms = now.tv_sec * 1000000 + now.tv_usec;
-
-	return now_ms;
-}
+// static size_t next = 0; /* sequence number of the next packet to be sent */
 
 /**
  * Returns how long the next call to select should wait (in microseconds).
@@ -87,16 +35,6 @@ inline static uint32_t get_timeout() {
 		}
 	}
 	return 0;
-}
-
-/**
- * Converts microseconds to a struct timeval.
- */
-inline static struct timeval micro_to_timeval(uint32_t us) {
-	struct timeval tv;
-	tv.tv_sec = us / 1000000;
-	tv.tv_usec = us % 1000000;
-	return tv;
 }
 
 /**
