@@ -11,22 +11,23 @@
 #include "util.h"
 #include "window.h"
 
-static const uint32_t TIMER = 4500000; /* retransmission timer (in microseconds) */
+const uint32_t TIMER = 4500000; /* retransmission timer (in microseconds) */
 
-static char *hostname; /* host we connect to */
-static uint16_t port; /* port we send to */
-static char *filename; /* file we read data from */
+char *hostname; /* host we connect to */
+uint16_t port; /* port we send to */
+char *filename; /* file we read data from */
 
-static bool reached_eof = false; /* whether we're done reading from the file */
-static window_t *w; /* sending window, buffer contains in-flight packets */
-// static size_t next = 0; /* sequence number of the next packet to be sent */
+int sockfd = -1; /* socket we're operating on */
+bool reached_eof = false; /* whether we're done reading from the file */
+window_t *w; /* sending window, buffer contains in-flight packets */
+// size_t next = 0; /* sequence number of the next packet to be sent */
 
 /**
  * Returns how long the next call to select should wait (in microseconds).
  * If the buffer is full or EOF has been reached, returns the time until the
  * closest timer expiration (no less than zero). Otherwise, returns zero.
  */
-inline static uint32_t get_timeout() {
+uint32_t get_timeout(void) {
 	if (window_full(w) || reached_eof) {
 		uint32_t timer = pkt_get_timestamp(window_peek_min_timestamp(w));
 		uint32_t now = get_monotime();
@@ -41,7 +42,7 @@ inline static uint32_t get_timeout() {
  * Sends a packet over the specified socket. Calls send and returns its value.
  * Exits if the packet couldn't be encoded.
  */
-int send_packet(int sockfd, pkt_t *pkt) {
+int send_packet(pkt_t *pkt) {
 	char buf[MAX_PACKET_SIZE];
 	size_t len = MAX_PACKET_SIZE;
 	if (pkt_encode(pkt, buf, &len) != PKT_OK) {
@@ -50,7 +51,30 @@ int send_packet(int sockfd, pkt_t *pkt) {
 	return send(sockfd, buf, len, 0);
 }
 
-static void read_write_loop(int sockfd) {
+/**
+ * Resend each packet for which the retransmission timer has expired.
+ * Exits on error.
+ */
+void retransmit_packets(void) {
+	uint32_t now = get_monotime();
+	pkt_t *delayed_pkt;
+	while ((delayed_pkt = window_peek_min_timestamp(w)) != NULL) {
+		uint32_t pkt_timer = pkt_get_timestamp(delayed_pkt);
+		if (now < pkt_timer) {
+			break;
+		}
+		if (window_update_timestamp(w, pkt_timer, now + TIMER) == -1) {
+			exit_msg("Cannot update timestamp of packet\n");
+		}
+		if (send_packet(delayed_pkt) == -1) {
+			exit_perror("send");
+		}
+		log_msg("Resent packet #%03d (time=%d)\n",
+			pkt_get_seqnum(delayed_pkt), pkt_get_timestamp(delayed_pkt));
+	}
+}
+
+void read_write_loop(void) {
 	while (true) {
 		/* Initialize the set inside the loop as it is mutated by select */
 		fd_set read_fds;
@@ -81,23 +105,7 @@ static void read_write_loop(int sockfd) {
 			log_msg("received\n");
 		}
 
-		/* Resend each packet which timer has expired */
-		pkt_t *delayed_pkt;
-		while ((delayed_pkt = window_peek_min_timestamp(w)) != NULL) {
-			uint32_t now = get_monotime();
-			uint32_t pkt_timer = pkt_get_timestamp(delayed_pkt);
-			if (now < pkt_timer) {
-				break;
-			}
-			if (window_update_timestamp(w, pkt_timer, now + TIMER) == -1) {
-				exit_msg("Cannot update timestamp of packet\n");
-			}
-			if (send_packet(sockfd, delayed_pkt) == -1) {
-				exit_perror("send");
-			}
-			log_msg("Resent packet #%03d (time=%d)\n",
-				pkt_get_seqnum(delayed_pkt), pkt_get_timestamp(delayed_pkt));
-		}
+		retransmit_packets();
 
 		/* If the window isn't full and we still have data to read,
 		 * just keep filling up the buffer */
@@ -126,7 +134,7 @@ static void read_write_loop(int sockfd) {
 			err = err || pkt_set_timestamp(pkt, get_monotime() + TIMER);
 			err = err || pkt_set_payload(pkt, buf, len);
 
-			if (send_packet(sockfd, pkt) == -1) {
+			if (send_packet(pkt) == -1) {
 				exit_perror("send");
 			}
 
@@ -156,7 +164,7 @@ int main(int argc, char **argv) {
 
 	/* Connect the socket. This tells the socket both to send to this
 	 * address by default and to only receive from this address. */
-	int sockfd = create_socket(NULL, -1, &dst_addr, port);
+	sockfd = create_socket(NULL, -1, &dst_addr, port);
 	if (sockfd == -1) {
 		exit_msg("create_socket: Could not create socket\n");
 	}
@@ -171,7 +179,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	read_write_loop(sockfd);
+	read_write_loop();
 
 	window_free(w);
 
