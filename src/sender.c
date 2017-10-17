@@ -98,6 +98,7 @@ inline static struct timeval micro_to_timeval(uint32_t us) {
 
 static void read_write_loop(int sockfd) {
 	while (true) {
+		/* Initialize the set inside the loop as it is mutated by select */
 		fd_set read_fds;
 		FD_ZERO(&read_fds);
 		FD_SET(sockfd, &read_fds);
@@ -203,6 +204,8 @@ int main(int argc, char **argv) {
 	}
 
 	read_write_loop(sockfd);
+
+	window_free(w);
 
 	return 0;
 }
