@@ -159,7 +159,7 @@ uint16_t pkt_get_length(const pkt_t* pkt) {
 }
 
 uint32_t pkt_get_timestamp(const pkt_t* pkt) {
-	return pkt->timestamp;
+	return ntohl(pkt->timestamp);
 }
 
 uint32_t pkt_get_crc1(const pkt_t* pkt) {
@@ -225,7 +225,7 @@ pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length) {
 }
 
 pkt_status_code pkt_set_timestamp(pkt_t *pkt, const uint32_t timestamp) {
-	pkt->timestamp = timestamp;
+	pkt->timestamp = htonl(timestamp);
 	return PKT_OK;
 }
 

@@ -92,6 +92,10 @@ size_t window_buffer_size(window_t *w) {
 	return w->bufsize;
 }
 
+bool window_empty(window_t *w) {
+	return w->bufsize == 0;
+}
+
 bool window_full(window_t *w) {
 	// We may have shrunk the window below the size of the buffer
 	// so check for that as well.

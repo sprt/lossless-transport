@@ -13,6 +13,9 @@ LDFLAGS = -lz
 
 .PHONY: default receiver sender tests
 
+default: SRCS += src/packet_implem.c
+default: SRCS += src/util.c
+default: SRCS += src/window.c
 default: sender receiver
 
 tests: LDFLAGS += -lcunit
@@ -24,10 +27,12 @@ tests:
 	$(CC) -o test $(SRCS) $(CFLAGS) $(LDFLAGS)
 	valgrind --leak-check=full --show-leak-kinds=all ./test
 
+sender: SRCS += src/sender.c
 sender:
 	@rm -f sender
-	$(CC) -o sender src/packet_implem.c src/util.c src/sender.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o sender $(SRCS) $(CFLAGS) $(LDFLAGS)
 
+receiver: SRCS += src/receiver.c
 receiver:
 	@rm -f receiver
-	$(CC) -o receiver src/packet_implem.c src/util.c src/receiver.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o receiver $(SRCS) $(CFLAGS) $(LDFLAGS)

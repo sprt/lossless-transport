@@ -53,6 +53,11 @@ int window_push(window_t *w, pkt_t *pkt);
 size_t window_buffer_size(window_t *w);
 
 /**
+ * Reports whether the internal *buffer* is empty.
+ */
+bool window_empty(window_t *w);
+
+/**
  * Reports whether the internal *buffer* can receive more packets.
  */
 bool window_full(window_t *w);
@@ -107,9 +112,9 @@ pkt_t *window_pop_min_seqnum(window_t *w);
  * Select on: recv
  *
  * Select timeout:
- * - If (done sending) and (queue empty):
+ * - If (eof reached) and (queue empty):
  *   - Break out
- * - ElseIf queue full:
+ * - ElseIf (queue full) or (eof reached):
  *   - Can't send more right now, first timer (wakes up on either recv or timer)
  * - Else:
  *   - Don't wait, fill buffer
@@ -133,7 +138,7 @@ pkt_t *window_pop_min_seqnum(window_t *w);
  *   - For all expired: pop, resend, update timer, push (w_peek_min_timestamp,
  *     w_pop_min_timestamp)
  *
- * - If window not full:
+ * - If (window not full) AND not (done sending):
  *   - Read 512 bytes, send, push packet to queue (w_push)
  *
  * Receiver
