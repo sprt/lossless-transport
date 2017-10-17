@@ -1,7 +1,9 @@
+#include <fcntl.h>
 #include <netdb.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "packet_interface.h"
@@ -18,35 +20,40 @@ static char *filename;
  * @return: as soon as stdin signals EOF
  */
 static void read_write_loop(int sockfd) {
-	while (true) {
-		// We have to reinitialize read_fds at each iteration as select
-		// mutates it.
-		fd_set read_fds;
-		FD_ZERO(&read_fds);
-		FD_SET(STDIN, &read_fds);
-		FD_SET(sockfd, &read_fds);
+	fd_set master;
+	FD_ZERO(&master);
+	FD_SET(STDIN_FILENO, &master);
+	FD_SET(sockfd, &master);
 
+	while (true) {
+		/* Make a copy of the master set at each iteration as later
+		 * we clear stdin from the set when we hit EOF. */
+		fd_set read_fds = master;
+
+		fprintf(stderr, "waiting\n");
 		if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
 			perror("select");
 			return;
 		}
 
-		fprintf(stderr, "waiting\n");
-
-		if (FD_ISSET(STDIN, &read_fds)) {
-			fprintf(stderr, "got data on stdin\n");
+		if (FD_ISSET(STDIN_FILENO, &read_fds)) {
+			fprintf(stderr, "got data from input\n");
 			char buf[MAX_PACKET_SIZE];
-			ssize_t len = read(STDIN, buf, MAX_PACKET_SIZE);
+			ssize_t len = read(STDIN_FILENO, buf, MAX_PACKET_SIZE);
 			if (len == -1) {
 				perror("read");
-				return;
+				exit(1);
 			}
-			if (send(sockfd, buf, len, 0) == -1) {
-				perror("send");
-				return;
+			if (len == 0) {
+				fprintf(stderr, "reached eof\n");
+				FD_CLR(STDIN_FILENO, &master);
+			} else {
+				if (send(sockfd, buf, len, 0) == -1) {
+					perror("send");
+					return;
+				}
+				fprintf(stderr, "sent\n");
 			}
-			fprintf(stderr, "sent\n");
-			// return;
 		}
 
 		if (FD_ISSET(sockfd, &read_fds)) {
@@ -100,6 +107,19 @@ int main(int argc, char **argv) {
 	int sockfd = create_socket(NULL, -1, &dst_addr, port);
 	if (sockfd == -1) {
 		exit(1);
+	}
+
+	if (filename != NULL) {
+		int fd = open(filename, O_RDONLY);
+		if (fd == -1) {
+			perror("fopen");
+			exit(1);
+		}
+		fprintf(stderr, "opened file\n");
+		if (dup2(fd, STDIN_FILENO) == -1) {
+			perror("dup2");
+			exit(1);
+		}
 	}
 
 	read_write_loop(sockfd);

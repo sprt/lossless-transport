@@ -68,11 +68,11 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 	size_t payload_size = pkt_get_length(pkt) * sizeof (*pkt->payload);
 
-	// Field errors should be returned in the order those fields are
-	// declared in the struct. We could return E_UNCONSISTENT if the packet
-	// has a payload and isn't of type PTYPE_DATA, but we don't since it
-	// isn't specified and thus doing so might break other implementations
-	// (albeit buggy ones).
+	/* Field errors should be returned in the order those fields are
+	 * declared in the struct. We could return E_UNCONSISTENT if the packet
+	 * has a payload and isn't of type PTYPE_DATA, but we don't since it
+	 * isn't specified and thus doing so might break other implementations
+	 * (albeit buggy ones). */
 	if (pkt_get_type(pkt) == 0) {
 		return E_TYPE;
 	} else if (pkt_get_type(pkt) != PTYPE_DATA && pkt_get_tr(pkt) != 0) {
@@ -105,12 +105,10 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 
 pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	pkt_t p = *pkt;
+
 	if (pkt_get_type(&p) == 0) {
 		return E_TYPE;
-	}
-
-	size_t total_size = pkt_get_total_size(&p);
-	if (total_size > *len) {
+	} else if (pkt_get_total_size(&p) > *len) {
 		*len = 0;
 		return E_NOMEM;
 	}

@@ -7,8 +7,6 @@
 
 #include <stdint.h>
 
-#define STDIN 0
-
 /**
  * Parses arguments from the command line and stores them in the corresponding
  * pointer. On error, prints usage on stderr and exits.
