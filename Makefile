@@ -2,6 +2,7 @@ CC = gcc
 CFLAGS += -g
 CFLAGS += -std=gnu99
 CFLAGS += -O1
+CFLAGS += -Wfatal-errors # Stop on the first error, otherwise gets overwhelming
 CFLAGS += -Werror
 CFLAGS += -Wall
 CFLAGS += -Wextra
