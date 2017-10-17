@@ -27,7 +27,6 @@ static void read_write_loop(int sockfd) {
 		log_msg("waiting\n");
 		if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
 			exit_perror("select");
-			return;
 		}
 
 		if (FD_ISSET(STDIN_FILENO, &read_fds)) {
@@ -53,8 +52,7 @@ static void read_write_loop(int sockfd) {
 			char buf[MAX_PACKET_SIZE];
 			int len = recv(sockfd, buf, MAX_PACKET_SIZE, 0);
 			if (len == -1) {
-				perror("recv");
-				return;
+				exit_perror("recv");
 			}
 			log_msg("received\n");
 		}
