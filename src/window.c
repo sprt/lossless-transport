@@ -38,8 +38,13 @@ window_t *window_create(size_t size, size_t max_size) {
 }
 
 void window_free(window_t *w) {
+	struct node *cur = w->front;
+	while (cur != NULL) {
+		struct node *next = cur->next;
+		free(cur);
+		cur = next;
+	}
 	free(w);
-	// TODO: free buffer
 }
 
 void window_slide(window_t *w) {
@@ -70,21 +75,18 @@ int window_push(window_t *w, pkt_t *pkt) {
 		return -1;
 	}
 
-	// Special case: buffer empty
 	if (w->front == NULL) {
-		struct node *front = calloc(1, sizeof (struct node));
-		if (front == NULL) {
-			return -1;
-		}
-		front->pkt = pkt;
-		w->front = front;
+		/* Special case: buffer empty */
+		w->front = rear;
+		w->rear = rear;
+	} else {
+		w->rear->next = rear;
+		w->rear = rear;
 	}
 
 	rear->pkt = pkt;
-	w->rear->next = rear;
-	w->rear = rear;
-
 	w->bufsize++;
+
 	return 0;
 }
 

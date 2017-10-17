@@ -9,6 +9,7 @@
 window_t *w;
 
 void setup_window(void) {
+	w = window_create(2, 4); // 3 [0 1] 2
 }
 
 void teardown_window(void) {
@@ -17,7 +18,6 @@ void teardown_window(void) {
 }
 
 void test_window_has(void) {
-	w = window_create(2, 4); // 3 [0 1] 2
 	CU_ASSERT_TRUE(window_has(w, 0));
 	CU_ASSERT_TRUE(window_has(w, 1));
 	CU_ASSERT_FALSE(window_has(w, 2));
@@ -25,8 +25,6 @@ void test_window_has(void) {
 }
 
 void test_window_slide(void) {
-	w = window_create(2, 4); // 3 [0 1] 2
-
 	window_slide(w); // 3 0 [1 2]
 	CU_ASSERT_FALSE(window_has(w, 0));
 	CU_ASSERT_TRUE(window_has(w, 1));
@@ -40,8 +38,21 @@ void test_window_slide(void) {
 	CU_ASSERT_TRUE(window_has(w, 3));
 }
 
+void test_window_push(void) {
+	pkt_t *p = pkt_new();
+
+	CU_ASSERT_EQUAL(window_push(w, p), 0);
+	CU_ASSERT_EQUAL(window_buffer_size(w), 1);
+
+	CU_ASSERT_EQUAL(window_push(w, p), 0);
+	CU_ASSERT_EQUAL(window_buffer_size(w), 2);
+
+	pkt_del(p);
+}
+
 CU_TestInfo window_tests[] = {
 	{"window_has", test_window_has},
 	{"window_slide", test_window_slide},
+	{"window_push", test_window_push},
 	CU_TEST_INFO_NULL,
 };
