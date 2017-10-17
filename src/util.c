@@ -1,8 +1,11 @@
+#include <errno.h>
 #include <getopt.h>
 #include <netdb.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void exit_usage(char **argv) {
 	fprintf(stderr, "Usage: %s <hostname> <port> [-f FILE]\n", argv[0]);
@@ -85,4 +88,23 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
 	}
 
 	return sockfd;
+}
+
+void log_msg(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+}
+
+void exit_msg(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	exit(1);
+}
+
+void exit_perror(const char *s) {
+	exit_msg("%s: %s\n", s, strerror(errno));
 }

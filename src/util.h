@@ -1,6 +1,7 @@
 #ifndef __UTIL_H_
 #define __UTIL_H_
 
+
 /**
  * Various utility functions used by both sender and receiver.
  */
@@ -34,5 +35,21 @@ const char *real_address(const char *address, struct sockaddr_in6 *rval);
  */
 int create_socket(struct sockaddr_in6 *source_addr, int src_port,
                   struct sockaddr_in6 *dest_addr, int dst_port);
+
+/**
+ * Prints a message on stderr.
+ */
+void log_msg(const char *fmt, ...);
+
+/**
+ * Prints a message on stderr and exits with a non-zero code.
+ */
+void exit_msg(const char *fmt, ...);
+
+/**
+ * Calls perror with the specified string and exits with a non-zero code.
+ */
+void exit_perror(const char *s);
+
 
 #endif  /* __UTIL_H_ */
