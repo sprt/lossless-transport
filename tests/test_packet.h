@@ -155,7 +155,7 @@ void test_pkt_decode(void) {
 	CU_ASSERT_EQUAL(pkt_get_tr(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_window(pkt), 28);
 	CU_ASSERT_EQUAL(pkt_get_seqnum(pkt), 0x7b);
-	CU_ASSERT_EQUAL(pkt_get_timestamp(pkt), 0x17);
+	CU_ASSERT_EQUAL(pkt_get_timestamp(pkt), 0x17000000);
 	CU_ASSERT_EQUAL(pkt_get_crc1(pkt), 0x33dae306);
 
 	char hello_world[] = "hello world";
@@ -178,7 +178,7 @@ void test_pkt_decode_no_payload(void) {
 	CU_ASSERT_EQUAL(pkt_get_tr(pkt), 0);
 	CU_ASSERT_EQUAL(pkt_get_window(pkt), 28);
 	CU_ASSERT_EQUAL(pkt_get_seqnum(pkt), 0x7b);
-	CU_ASSERT_EQUAL(pkt_get_timestamp(pkt), 0x17);
+	CU_ASSERT_EQUAL(pkt_get_timestamp(pkt), 0x17000000);
 	CU_ASSERT_EQUAL(pkt_get_crc1(pkt), 0x440ad217);
 
 	CU_ASSERT_EQUAL_FATAL(pkt_get_length(pkt), 0);
