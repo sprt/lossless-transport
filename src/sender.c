@@ -28,9 +28,15 @@ window_t *w; /* sending window, buffer contains in-flight packets */
  * closest timer expiration (no less than zero). Otherwise, returns zero.
  */
 uint32_t get_timeout(void) {
+	/* Select waits until either the socket is ready for reading or the
+	 * timeout expires. If the window is full or if we've reached EOF on the
+	 * file, we can't write any more data right now and we should block,
+	 * albeit at *most* until the closest timer in the window expires. */
 	if (window_full(w) || reached_eof) {
 		uint32_t timer = pkt_get_timestamp(window_peek_min_timestamp(w));
 		uint32_t now = get_monotime();
+		/* select doesn't like negative timeouts, and we can't return
+		 * a negative number through an unsigned type anyway */
 		if (timer > now) {
 			return timer - now;
 		}
@@ -63,12 +69,15 @@ void retransmit_packets(void) {
 		if (now < pkt_timer) {
 			break;
 		}
+		/* Reschedule the retransmission of the packet in case it fails again */
 		if (window_update_timestamp(w, pkt_timer, now + TIMER) == -1) {
 			exit_msg("Cannot update timestamp of packet\n");
 		}
+		/* Resend it now */
 		if (send_packet(delayed_pkt) == -1) {
 			exit_perror("send");
 		}
+		/* The packet was in the buffer already so nothing else to do */
 		log_msg("Resent packet #%03d (time=%d)\n",
 			pkt_get_seqnum(delayed_pkt), pkt_get_timestamp(delayed_pkt));
 	}
@@ -88,9 +97,12 @@ void read_write_loop(void) {
 			break;
 		}
 
+		/* Timeout will be zero unless the buffer is full or EOF was reached */
 		struct timeval timeout = micro_to_timeval(get_timeout());
 		log_msg("select waiting for %lu.%lus\n", timeout.tv_sec, timeout.tv_usec);
 
+		/* Wait until either we receive data on the socket
+		 * or the timeout expires */
 		if (select(sockfd + 1, &read_fds, NULL, NULL, &timeout) == -1) {
 			exit_perror("select");
 		}
@@ -138,6 +150,8 @@ void read_write_loop(void) {
 				exit_perror("send");
 			}
 
+			/* Packet is in-flight and non-acknowledged,
+			 * hence add it to the buffer */
 			if (window_push(w, pkt) == -1) {
 				exit_msg("Could not add packet to buffer\n");
 			}

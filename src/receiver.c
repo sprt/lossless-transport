@@ -6,10 +6,11 @@
 
 #include "packet_interface.h"
 #include "util.h"
+#include "window.h"
 
-static char *hostname;
-static uint16_t port;
-static char *filename;
+char *hostname; /* host we bind to */
+uint16_t port; /* port we receive on */
+char *filename; /* file on which we write out data */
 
 /* Loop reading a socket and printing to stdout,
  * while reading stdin and writing to the socket.
