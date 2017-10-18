@@ -6,7 +6,7 @@
  * Various utility functions used by sender and receiver.
  */
 
-#include <stdint.h>
+#include <netdb.h>
 
 /**
  * Parses arguments from the command line and stores them in the corresponding

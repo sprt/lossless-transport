@@ -1,6 +1,3 @@
-#include <getopt.h>
-#include <netdb.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 

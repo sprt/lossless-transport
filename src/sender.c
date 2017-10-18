@@ -1,10 +1,4 @@
 #include <fcntl.h>
-#include <netdb.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/time.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "packet_interface.h"

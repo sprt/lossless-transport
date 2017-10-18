@@ -1,8 +1,7 @@
-#include <stdlib.h>
 #include <memory.h>
-#include <stdio.h>
-#include <stdbool.h>
 #include <netinet/in.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <zlib.h>
 
 #include "packet_interface.h"

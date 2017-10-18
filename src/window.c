@@ -1,7 +1,3 @@
-#include <assert.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdlib.h>
 
 #include "packet_interface.h"
@@ -48,7 +44,7 @@ void window_free(window_t *w) {
 }
 
 void window_slide(window_t *w) {
-	w->pos = (w->pos + 1) % w->capacity; // % capacity so when pos = capacity, it gets back to 0
+	w->pos = (w->pos + 1) % w->capacity;
 }
 
 bool window_has(window_t *w, size_t seqnum) {
