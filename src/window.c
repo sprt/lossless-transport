@@ -109,20 +109,16 @@ bool window_full(window_t *w) {
 }
 
 int window_update_timestamp(window_t *w, uint32_t old_time, uint32_t new_time) {
-	pkt_t *match = NULL;
 	struct node *cur = w->front;
 	while (cur != NULL) {
 		if (pkt_get_timestamp(cur->pkt) == old_time) {
-			match = cur->pkt;
-			break;
+			pkt_set_timestamp(cur->pkt, new_time);
+			return 0;
 		}
 		cur = cur->next;
 	}
-	if (match == NULL) {
-		return -1;
-	}
-	pkt_set_timestamp(match, new_time);
-	return 0;
+	/* Reached only if there's no match */
+	return -1;
 }
 
 // // Unsure if needed
