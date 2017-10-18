@@ -96,7 +96,7 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
 
 	if (source_addr != NULL && src_port > 0) {
 		source_addr->sin6_port = htons(src_port);
-		if (bind(sockfd, (struct sockaddr *) source_addr, sizeof (*source_addr)) != 0) {
+		if (bind(sockfd, (struct sockaddr *) source_addr, sizeof (*source_addr)) != 0) { //affect a name to the socket by binding source_addr to the socket specified in sockfd
 			perror("bind");
 			return -1;
 		}
@@ -104,7 +104,7 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
 
 	if (dest_addr != NULL && dst_port > 0) {
 		dest_addr->sin6_port = htons(dst_port);
-		if (connect(sockfd, (struct sockaddr *) dest_addr, sizeof (*dest_addr)) != 0) {
+		if (connect(sockfd, (struct sockaddr *) dest_addr, sizeof (*dest_addr)) != 0) { //connect the socket referenced in sockfd to the address in dest_addr
 			perror("connect");
 			return -1;
 		}
