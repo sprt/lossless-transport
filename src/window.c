@@ -48,7 +48,7 @@ void window_free(window_t *w) {
 }
 
 void window_slide(window_t *w) {
-	w->pos = (w->pos + 1) % w->capacity;
+	w->pos = (w->pos + 1) % w->capacity; // % capacity so when pos = capacity, it gets back to 0
 }
 
 bool window_has(window_t *w, size_t seqnum) {
