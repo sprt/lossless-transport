@@ -78,6 +78,7 @@ const char *real_address(const char *address, struct sockaddr_in6 *rval) {
 		return gai_strerror(err);
 	}
 
+	//ai_addr contains a pointer to the socket's address
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) infoptr->ai_addr;
 	*rval = *addr;
 
