@@ -37,12 +37,14 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
                   struct sockaddr_in6 *dest_addr, int dst_port);
 
 /**
- * Returns the amount of time in microseconds eapsed since an arbitrary point
- * in time in a STRICTLY monotonic fashion.
- * The returned values being strictly monotonic is crucial to the correct
- * identification of ACKs received for out-of-sequence packets, as it relies on
- * the timestamp field.
- * The first call returns 0.
+ * Returns the amount of time (in microseconds) elapsed since an arbitrary point
+ * in time, in a STRICTLY monotonic fashion, with the first call returning 0.
+ *
+ * Rationale: from the perspective of the receiver, the only way to acknowledge
+ * an out-of-sequence packet is to set the timestamp field of the ACK to the
+ * timestamp of that packet (it can't simply set the seqnum field as ACKs are
+ * cumulative), hence it is crucial that no two packets share the same timestamp
+ * for when the sender removes it from its buffer.
  */
 uint32_t get_monotime(void);
 
