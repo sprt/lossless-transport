@@ -159,7 +159,7 @@ void read_write_loop(void) {
 int main(int argc, char **argv) {
 	parse_args(argc, argv, &hostname, &port, &filename);
 
-	w = window_create(10, MAX_WINDOW_SIZE);
+	w = window_create(1, MAX_WINDOW_SIZE);
 	if (w == NULL) {
 		exit_msg("window_create: Could not create window\n");
 	}
