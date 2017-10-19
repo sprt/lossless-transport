@@ -59,6 +59,11 @@ struct timeval micro_to_timeval(uint32_t us);
 void log_msg(const char *fmt, ...);
 
 /**
+ * Calls perror with the specified string.
+ */
+void log_perror(const char *s);
+
+/**
  * Prints a message on stderr and exits with a non-zero code.
  */
 void exit_msg(const char *fmt, ...);

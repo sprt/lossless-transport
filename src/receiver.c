@@ -9,109 +9,122 @@ char *hostname; /* host we bind to */
 uint16_t port; /* port we receive on */
 char *filename; /* file on which we write out data */
 
-/* Loop reading a socket and printing to stdout,
- * while reading stdin and writing to the socket.
- * @sockfd: The socket file descriptor. It is both bound and connected.
- * @return: as soon as stdin signals EOF
- */
-// static void read_write_loop(int sockfd) {
-// 	while (true) {
-// 		// We have to reinitialize read_fds at each iteration as select
-// 		// mutates it.
-// 		fd_set read_fds;
-// 		FD_ZERO(&read_fds);
-// 		FD_SET(STDIN, &read_fds);
-// 		FD_SET(sockfd, &read_fds);
-
-// 		if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
-// 			perror("select");
-// 			return;
-// 		}
-
-// 		fprintf(stderr, "waiting\n");
-
-// 		if (FD_ISSET(STDIN, &read_fds)) {
-// 			char buf[1024] = {0};
-// 			size_t len = 0;
-// 			int c;
-// 			while ((c = fgetc(stdin)) != EOF) {
-// 				buf[len++] = c;
-// 			}
-// 			if (ferror(stdin) != 0) {
-// 				fprintf(stderr, "Error reading from stdin\n");
-// 				clearerr(stdin);
-// 				return;
-// 			}
-// 			if (send(sockfd, buf, len, 0) == -1) {
-// 				perror("send");
-// 				return;
-// 			}
-// 			fprintf(stderr, "stdin -> socket: %s\n", buf);
-// 			return;
-// 		}
-
-// 		if (FD_ISSET(sockfd, &read_fds)) {
-// 			char buf[1024] = {0};
-// 			int len = recv(sockfd, buf, 1024, 0);
-// 			if (len == -1) {
-// 				perror("recv");
-// 				return;
-// 			}
-// 			fprintf(stderr, "socket -> stdout: %s\n", buf);
-// 		}
-// 	}
-// }
+int sockfd = -1; /* socket we're listening on */
+FILE *outfile; /* file we're writing out the data to */
+window_t *w; /* receiving window, buffer contains out-of-sequence packets */
+size_t next = 0; /* sequence number of the next expected packet */
 
 /**
- * Block the caller until a message is received on sockfd,
- * and connect the socket to the source addresse of the received message.
- * @sockfd: a file descriptor to a bound socket but not yet connected.
- * @return: 0 in case of success, -1 otherwise.
- * @POST: This call is idempotent, it does not 'consume' the data of the
- *        message, and could be repeated several times blocking only at the
- *        first call.
+ * Blocks until we receive the first packet and then establishes the
+ * connection to the sender. Does not consume the message (ie. a subsequent call
+ * to recv will see the same data). On error, prints on stderr and returns -1;
+ * otherwise, returns 0. Assumes the socket isn't connected.
  */
-static int wait_for_client(int sockfd) {
-	// static bool connected = false;
-	// if (connected) {
-	// 	return 0;
-	// }
+int wait_for_client(void) {
 	char buf[MAX_PACKET_SIZE];
 	struct sockaddr_in6 addr;
 	socklen_t addrlen = sizeof (addr);
-	if (recvfrom(sockfd, buf, MAX_PACKET_SIZE, 0 /* TODO: MSG_PEEK */, (struct sockaddr *) &addr, &addrlen) == -1) {
-		perror("recvfrom");
+
+	/* Wait for a packet from anyone */
+	if (recvfrom(sockfd, buf, MAX_PACKET_SIZE, MSG_PEEK, (struct sockaddr *) &addr, &addrlen) == -1) {
+		log_perror("recvfrom");
 		return -1;
 	}
+
+	/* For UDP, connecting merely implies setting the address to which data
+	 * is sent by default, and the only address from which data is received. */
 	if (connect(sockfd, (struct sockaddr *) &addr, addrlen) == -1) {
-		perror("connect");
+		log_perror("connect");
 		return -1;
 	}
-	// connected = true;
+
 	return 0;
+}
+
+/**
+ * Called inside an infinite loop. Exits on error.
+ */
+void main_loop(void) {
+	/* Initialize the set inside the loop as it is mutated by select */
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sockfd, &read_fds);
+
+	log_msg("Waiting for a packet\n");
+
+	if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
+		exit_perror("select");
+	}
+
+	/* If this is reached, select returned and we know we have a packet
+	 * since read_fds only contains one file descriptor. */
+
+	// if (window_full(w)) {
+	// 	log_msg("Window full, discarding\n");
+	// 	return;
+	// }
+
+	/* Read the datagram received into a buffer */
+	char buf[MAX_PACKET_SIZE];
+	int len = recv(sockfd, buf, MAX_PACKET_SIZE, 0);
+	if (len == -1) {
+		exit_perror("recv");
+	}
+
+	/* Decode the datagram into a packet */
+	pkt_t *pkt = pkt_new();
+	if (pkt == NULL) {
+		exit_msg("Could not allocate packet\n");
+	}
+	if (pkt_decode(buf, len, pkt) != PKT_OK) {
+		log_msg("Error decoding packet (%d), ignoring", pkt_decode);
+		return;
+	}
+
+	log_msg("Seqnum=%03d, TR=%d, Length=%03d, Timestamp=%010d\n",
+		pkt_get_seqnum(pkt), pkt_get_tr(pkt), pkt_get_length(pkt),
+		pkt_get_timestamp(pkt));
 }
 
 int main(int argc, char **argv) {
 	parse_args(argc, argv, &hostname, &port, &filename);
 
+	if (filename == NULL) {
+		outfile = stdin;
+	} else {
+		outfile = fopen(filename, "wb+");
+		if (outfile == NULL) {
+			exit_perror("fopen");
+		}
+	}
+
+	w = window_create(MAX_WINDOW_SIZE, MAX_WINDOW_SIZE);
+	if (w == NULL) {
+		exit_msg("Could not create window\n");
+	}
+
 	struct sockaddr_in6 addr;
 	const char *err = real_address(hostname, &addr);
 	if (err != NULL) {
-		fprintf(stderr, "real_address: %s\n", err);
-		exit(1);
+		exit_msg("real_address: %s\n", err);
 	}
 
-	// Bind the socket
-	int sockfd = create_socket(&addr, port, NULL, -1);
+	/* Bind the socket */
+	sockfd = create_socket(&addr, port, NULL, -1);
 	if (sockfd == -1) {
 		exit(1);
 	}
 
+	log_msg("Waiting for sender\n");
+	if (wait_for_client() == -1) {
+		exit_msg("Error waiting for sender\n");
+	}
+
+	log_msg("Received first packet, connected\n");
+
 	while (true) {
-		fprintf(stderr, "waiting for first packet...\n");
-		if (wait_for_client(sockfd) == 0) {
-			fprintf(stderr, "received first packet, connected\n");
-		}
+		/* This is probably the line you're looking for */
+		main_loop();
 	}
 
 	return 0;
