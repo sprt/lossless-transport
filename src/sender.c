@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include "packet_interface.h"
@@ -14,6 +15,7 @@ uint16_t port; /* port we send to */
 char *filename; /* file we read data from */
 
 int sockfd = -1; /* socket we're operating on */
+FILE *infile; /* file we're reading data from */
 bool reached_eof = false; /* whether we're done reading from the file */
 window_t *w; /* sending window, buffer contains in-flight packets */
 size_t next = 0; /* sequence number of the next packet to be sent */
@@ -186,15 +188,14 @@ void main_loop(void) {
 	 * just keep filling up the buffer */
 	if (!window_full(w) && !reached_eof) {
 		char buf[MAX_PAYLOAD_SIZE] = {0};
-		ssize_t len = read(STDIN_FILENO, buf, MAX_PAYLOAD_SIZE);
-		if (len == -1) {
-			exit_perror("read");
-		}
+		size_t len = fread(buf, sizeof (*buf), MAX_PAYLOAD_SIZE, infile);
 
-		if (len == 0) {
-			log_msg("Reached EOF\n");
+		if (len < MAX_PAYLOAD_SIZE) { /* either error or EOF */
+			if (ferror(infile)) {
+				exit_msg("Error reading from file\n");
+			}
 			reached_eof = true;
-			return;
+			log_msg("Reached EOF\n");
 		}
 
 		pkt_t *pkt = pkt_new();
@@ -252,13 +253,12 @@ int main(int argc, char **argv) {
 		exit_msg("create_socket: Could not create socket\n");
 	}
 
-	if (filename != NULL) {
-		int fd = open(filename, O_RDONLY);
-		if (fd == -1) {
-			exit_perror("open");
-		}
-		if (dup2(fd, STDIN_FILENO) == -1) {
-			exit_perror("dup2");
+	if (filename == NULL) {
+		infile = stdin;
+	} else {
+		infile = fopen(filename, "rb");
+		if (infile == NULL) {
+			exit_perror("fopen");
 		}
 	}
 
