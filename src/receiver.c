@@ -78,6 +78,7 @@ void main_loop(void) {
 
 	if (!window_has(w, pkt_get_seqnum(pkt))) {
 		log_msg("Out of window, discarding");
+		pkt_del(pkt);
 		return;
 	}
 
@@ -88,6 +89,8 @@ void main_loop(void) {
 	}
 
 	if (pkt_get_tr(pkt)) {
+		pkt_del(pkt);
+
 		/* Send a NACK if we receive a truncated packet */
 		pkt_status_code err = PKT_OK;
 		err = err || pkt_set_type(reply, PTYPE_NACK);
@@ -112,33 +115,35 @@ void main_loop(void) {
 		}
 
 		/* Write out the in-sequence packets that are at the beginning
-		 * of the window */
-		while (!window_empty(w)) {
-			/* If the sequence number of the first packet in the
-			 * buffer corresponds to the first sequence number in
-			 * the window, then the first packet in the buffer is
-			 * in-sequence, and we can write it out to the file. */
-			pkt_t *min_seqnum = window_peek_min_seqnum(w);
-			if (pkt_get_seqnum(min_seqnum) == window_start(w)) {
-				/* Now try to write the packet to the file.
-				 * Iff this succeeds, we can pop it from the
-				 * buffer and slide the window. */
+		 * of the window.
+		 *
+		 * If the sequence number of the first packet in the buffer
+		 * corresponds to the first sequence number in the window, then
+		 * the first packet in the buffer is in-sequence, and we can
+		 * write it out to the file. */
+		pkt_t *min_seqnum = window_peek_min_seqnum(w);
+		while (min_seqnum != NULL && pkt_get_seqnum(min_seqnum) == window_start(w)) {
+			/* Try to write the packet to the file. Iff this
+			 * succeeds, we can pop it from the buffer and slide the
+			 * window. */
 
-				char fbuf[MAX_PACKET_SIZE];
-				size_t flen = MAX_PACKET_SIZE;
+			char fbuf[MAX_PACKET_SIZE];
+			size_t flen = MAX_PACKET_SIZE;
 
-				pkt_status_code err = pkt_encode(min_seqnum, fbuf, &flen);
-				if (err != PKT_OK) {
-					exit_msg("Could not encode packet to store in fbuffer: %d", err);
-				}
-
-				if (fwrite(fbuf, sizeof (*fbuf), flen, outfile) < flen) {
-					exit_msg("Could not write to file\n");
-				}
-
-				window_pop_min_seqnum(w);
-				window_slide(w);
+			pkt_status_code err = pkt_encode(min_seqnum, fbuf, &flen);
+			if (err != PKT_OK) {
+				exit_msg("Could not encode packet to store in buffer: %d", err);
 			}
+
+			if (fwrite(fbuf, sizeof (*fbuf), flen, outfile) < flen) {
+				exit_msg("Error writing to file\n");
+			}
+
+			window_pop_min_seqnum(w);
+			window_slide(w);
+
+			pkt_del(min_seqnum);
+			min_seqnum = window_peek_min_seqnum(w);
 		}
 
 		/* There's no duplication so we can just send an ACK */
@@ -157,6 +162,8 @@ void main_loop(void) {
 			exit_perror("Could not send ACK: send:");
 		}
 	}
+
+	pkt_del(reply);
 }
 
 int main(int argc, char **argv) {

@@ -203,6 +203,7 @@ struct node *window_find_min_seqnum(window_t *w) {
 		if (min == NULL || pkt_get_seqnum(cur->pkt) < pkt_get_seqnum(min->pkt)) {
 			min = cur;
 		}
+		cur = cur->next;
 	}
 	return min;
 }
