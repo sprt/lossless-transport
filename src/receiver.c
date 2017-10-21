@@ -12,7 +12,7 @@ char *filename; /* file on which we write out data */
 int sockfd = -1; /* socket we're listening on */
 FILE *outfile; /* file we're writing out the data to */
 window_t *w; /* receiving window, buffer contains out-of-sequence packets */
-size_t next = 0; /* sequence number of the next expected packet */
+bool reached_eof; /* whether we've received the empty packet that signals EOF */
 
 /**
  * Blocks until we receive the first packet and then establishes the
@@ -42,7 +42,8 @@ int wait_for_client(void) {
 }
 
 /**
- * Called inside an infinite loop. Exits on error.
+ * Called inside a loop that terminates on (!reached_eof || !window_empty(w)).
+ * Exits on error.
  */
 void main_loop(void) {
 	/* Initialize the set inside the loop as it is mutated by select */
@@ -144,6 +145,11 @@ void main_loop(void) {
 			window_pop_min_seqnum(w);
 			window_slide(w);
 
+			if (pkt_get_length(min_seqnum) == 0 && !pkt_get_tr(min_seqnum)) {
+				reached_eof = true;
+				log_msg("Received EOF packet\n");
+			}
+
 			pkt_del(min_seqnum);
 			min_seqnum = window_peek_min_seqnum(w);
 		}
@@ -207,7 +213,7 @@ int main(int argc, char **argv) {
 
 	log_msg("Received first packet, connected\n");
 
-	while (true) {
+	while (!reached_eof || !window_empty(w)) {
 		/* This is probably the line you're looking for */
 		main_loop();
 	}

@@ -18,6 +18,7 @@ int sockfd = -1; /* socket we're operating on */
 FILE *infile; /* file we're reading data from */
 window_t *w; /* sending window, buffer contains in-flight packets */
 size_t next = 0; /* sequence number of the next packet to be sent */
+bool sent_eof; /* whether we've sent the empty packet that signals EOF */
 
 /**
  * Returns how long the next call to select should wait (in microseconds).
@@ -29,7 +30,7 @@ uint32_t get_timeout(void) {
 	 * timeout expires. If the window is full or if we've reached EOF on the
 	 * file, we can't write any more data right now and we should block,
 	 * albeit at *most* until the closest timer in the window expires. */
-	if (window_full(w) || feof(infile)) {
+	if (window_full(w) || sent_eof) {
 		uint32_t timer = pkt_get_timestamp(window_peek_min_timestamp(w));
 		uint32_t now = get_monotime();
 		/* select doesn't like negative timeouts, and we can't return
@@ -124,7 +125,8 @@ void retransmit_packets(void) {
 }
 
 /**
- * Called inside an infinite loop. Exits on error.
+ * Called inside a loop that terminates on (!sent_eof || !window_empty(w)).
+ * Exits on error.
  */
 void main_loop(void) {
 	/* Initialize the set inside the loop as it is mutated by select */
@@ -185,7 +187,7 @@ void main_loop(void) {
 
 	/* If the window isn't full and we still have data to read,
 	 * just keep filling up the buffer */
-	if (!window_full(w) && !feof(infile)) {
+	if (!window_full(w) && !sent_eof) {
 		char buf[MAX_PAYLOAD_SIZE] = {0};
 		size_t len = fread(buf, sizeof (*buf), MAX_PAYLOAD_SIZE, infile);
 
@@ -217,16 +219,21 @@ void main_loop(void) {
 			exit_perror("send");
 		}
 
-		next = (next + 1) % window_get_max_size(w);
-
 		/* Packet is in-flight and non-acknowledged,
 		 * hence add it to the buffer */
 		if (window_push(w, pkt) == -1) {
 			exit_msg("Could not add packet to buffer\n");
 		}
 
+		next = (next + 1) % window_get_max_size(w);
+
 		log_msg("Sent packet:\n");
 		log_pkt(pkt);
+
+		if (len == 0) {
+			log_msg("Sent EOF packet\n");
+			sent_eof = true;
+		}
 	}
 }
 
@@ -260,7 +267,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	while (!feof(infile) || !window_empty(w)) {
+	while (!sent_eof || !window_empty(w)) {
 		/* This is probably the line you're looking for */
 		main_loop();
 	}
