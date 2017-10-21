@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
 	parse_args(argc, argv, &hostname, &port, &filename);
 
 	if (filename == NULL) {
-		outfile = stdin;
+		outfile = stdout;
 	} else {
 		outfile = fopen(filename, "wb+");
 		if (outfile == NULL) {
