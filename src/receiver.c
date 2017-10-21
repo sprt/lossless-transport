@@ -134,15 +134,10 @@ void main_loop(void) {
 			 * succeeds, we can pop it from the buffer and slide the
 			 * window. */
 
-			char fbuf[MAX_PACKET_SIZE];
-			size_t flen = MAX_PACKET_SIZE;
+			const char *payload = pkt_get_payload(min_seqnum);
+			size_t payload_len = pkt_get_length(min_seqnum);
 
-			pkt_status_code err = pkt_encode(min_seqnum, fbuf, &flen);
-			if (err != PKT_OK) {
-				exit_msg("Could not encode packet to store in buffer: %d", err);
-			}
-
-			if (fwrite(fbuf, sizeof (*fbuf), flen, outfile) < flen) {
+			if (fwrite(payload, sizeof (*payload), payload_len, outfile) < payload_len) {
 				exit_msg("Error writing to file\n");
 			}
 
