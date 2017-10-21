@@ -131,13 +131,6 @@ void main_loop(void) {
 	FD_ZERO(&read_fds);
 	FD_SET(sockfd, &read_fds);
 
-	/* If we're done reading and all packets have been acknowledged,
-	 * we can just quit */
-	if (reached_eof && window_empty(w)) {
-		log_msg("Reached EOF and window empty, breaking out\n");
-		return;
-	}
-
 	/* Timeout will be zero unless the buffer is full or EOF was reached */
 	uint32_t timeout_us = get_timeout();
 	struct timeval timeout_tv = micro_to_timeval(timeout_us);
@@ -228,7 +221,7 @@ void main_loop(void) {
 		next = (next + 1) % window_get_max_size(w);
 
 		/* Packet is in-flight and non-acknowledged,
-			* hence add it to the buffer */
+		 * hence add it to the buffer */
 		if (window_push(w, pkt) == -1) {
 			exit_msg("Could not add packet to buffer\n");
 		}
@@ -269,7 +262,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	while (true) {
+	while (!reached_eof || !window_empty(w)) {
 		/* This is probably the line you're looking for */
 		main_loop();
 	}
