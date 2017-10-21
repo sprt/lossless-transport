@@ -218,5 +218,7 @@ int main(int argc, char **argv) {
 		main_loop();
 	}
 
+	window_free(w);
+
 	return 0;
 }
