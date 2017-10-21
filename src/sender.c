@@ -40,6 +40,60 @@ uint32_t get_timeout(void) {
 	return 0;
 }
 
+void handle_ack(pkt_t *ack) {
+	/* The seqnum field has the next sequence number expected by the receiver.
+	 * The timestamp field corresponds to the last packet received by the receiver. */
+
+	/* Whether the packet with the given timestamp has been popped from the buffer. */
+	bool popped_timestamp = false;
+
+	/* ACKs are cumulative so we can remove from the buffer all packets that
+	 * have a smaller sequence number. */
+	pkt_t *min_seqnum = window_peek_min_seqnum(w);
+	while (min_seqnum != NULL && pkt_get_seqnum(min_seqnum) < pkt_get_seqnum(ack)) {
+		window_pop_min_seqnum(w);
+		if (pkt_get_timestamp(min_seqnum) == pkt_get_timestamp(ack)) {
+			popped_timestamp = true;
+		}
+
+		window_slide(w);
+
+		/* Resize the sending window according to the receiving window
+		 * so as not to overload the receiver. */
+		size_t swin = window_get_size(w);
+		size_t rwin = pkt_get_window(ack);
+		window_resize(w, MIN(swin, rwin));
+
+		pkt_del(min_seqnum);
+		min_seqnum = window_peek_min_seqnum(w);
+	}
+
+	if (!popped_timestamp) {
+		pkt_t *last = window_pop_timestamp(w, pkt_get_timestamp(ack));
+		if (last == NULL) {
+			exit_msg("No packet with matching timestamp in buffer\n");
+		}
+		pkt_del(last);
+	}
+}
+
+void handle_nack(pkt_t *nack) {
+	if (!window_has(w, pkt_get_seqnum(nack))) {
+		log_msg("Out of window, discarding\n");
+		return;
+	}
+
+	pkt_t *match = window_find_seqnum(w, pkt_get_seqnum(nack));
+	if (match == NULL) {
+		exit_msg("No packet with matching timestamp in buffer\n");
+	}
+
+	/* Set the timer of the corresponding packet to the current time
+	 * so that it will be resent immediately (retransmit_packets calls
+	 * get_monotime after this). */
+	pkt_set_timestamp(match, get_monotime());
+}
+
 /**
  * Resend each packet for which the retransmission timer has expired.
  * Exits on error.
@@ -47,18 +101,23 @@ uint32_t get_timeout(void) {
 void retransmit_packets(void) {
 	uint32_t now = get_monotime();
 	pkt_t *pkt = window_peek_min_timestamp(w);
+
 	while (pkt != NULL && pkt_get_timestamp(pkt) <= now) {
 		/* Reschedule the retransmission of the packet in case it fails again */
 		if (window_update_timestamp(w, pkt_get_timestamp(pkt), now + TIMER) == -1) {
 			exit_msg("Cannot update timestamp of packet\n");
 		}
+
 		/* Resend it now */
 		if (send_packet(sockfd, pkt) == -1) {
 			exit_perror("send");
 		}
+
 		/* The packet was in the buffer already so nothing else to do */
+
 		log_msg("Resent packet:\n");
 		log_pkt(pkt);
+
 		pkt = window_peek_min_timestamp(w);
 	}
 }
@@ -76,7 +135,7 @@ void main_loop(void) {
 	 * we can just quit */
 	if (reached_eof && window_empty(w)) {
 		log_msg("Reached EOF and window empty, breaking out\n");
-		break;
+		return;
 	}
 
 	/* Timeout will be zero unless the buffer is full or EOF was reached */
@@ -100,92 +159,34 @@ void main_loop(void) {
 			exit_perror("recv");
 		}
 
-		pkt_t *pkt = pkt_new();
-		if (pkt == NULL) {
+		pkt_t *resp = pkt_new();
+		if (resp == NULL) {
 			exit_msg("Could not allocate packet\n");
 		}
 
-		if (pkt_decode(buf, len, pkt) != PKT_OK) {
-			log_msg("Error decoding packet: %d\n", pkt);
-			goto retr;
-		}
+		if (pkt_decode(buf, len, resp) != PKT_OK) {
+			log_msg("Error decoding packet: %d\n", resp);
+		} else {
+			log_pkt(resp);
 
-		log_pkt(pkt);
+			switch (pkt_get_type(resp)) {
+			case PTYPE_DATA:
+				log_msg("DATA packet, ignoring\n");
+				return;
 
-		switch (pkt_get_type(pkt)) {
-		case PTYPE_DATA:
-			log_msg("DATA packet, ignoring\n");
-			goto retr;
+			case PTYPE_ACK:
+				log_msg("ACK for #%d\n", pkt_get_seqnum(resp) - 1);
+				handle_ack(resp);
+				break;
 
-		case PTYPE_NACK:
-			/* On NACK, just set the timer of the
-			 * corresponding packet to the current time so
-			 * that it will be resent right away. */
-
-			log_msg("NACK for #%d\n", pkt_get_seqnum(pkt));
-
-			if (!window_has(w, pkt_get_seqnum(pkt))) {
-				log_msg("Out of window, discarding\n");
-				goto retr;
+			case PTYPE_NACK:
+				log_msg("NACK for #%d\n", pkt_get_seqnum(resp));
+				handle_nack(resp);
+				break;
 			}
-
-			pkt_t *match = window_find_seqnum(w, pkt_get_seqnum(pkt));
-			if (match == NULL) {
-				exit_msg("No packet with matching timestamp in buffer\n");
-			}
-
-			pkt_set_timestamp(match, get_monotime());
-
-			break;
-
-		case PTYPE_ACK:
-			log_msg("ACK for #%d\n", pkt_get_seqnum(pkt) - 1);
-
-			/* The seqnum field has the next sequence number
-			 * expected by the receiver.
-			 * The timestamp field corresponds to the last
-			 * packet received by the receiver. */
-
-			/* Whether the packet with the given timestamp
-			 * has been popped from the buffer. */
-			bool popped_timestamp = false;
-
-			/* ACKs are cumulative so we can remove from the
-			 * buffer all packets that have a smaller
-			 * sequence number. */
-			pkt_t *min_seqnum = window_peek_min_seqnum(w);
-			while (min_seqnum != NULL && pkt_get_seqnum(min_seqnum) < pkt_get_seqnum(pkt)) {
-				window_pop_min_seqnum(w);
-				if (pkt_get_timestamp(min_seqnum) == pkt_get_timestamp(pkt)) {
-					popped_timestamp = true;
-				}
-
-				window_slide(w);
-
-				/* Resize the sending window according
-				 * to the receiving window so as not to
-				 * overload the receiver. */
-				size_t swin = window_get_size(w);
-				size_t rwin = pkt_get_window(pkt);
-				window_resize(w, MIN(swin, rwin));
-
-				pkt_del(min_seqnum);
-				min_seqnum = window_peek_min_seqnum(w);
-			}
-
-			if (!popped_timestamp) {
-				pkt_t *last = window_pop_timestamp(w, pkt_get_timestamp(pkt));
-				if (last == NULL) {
-					exit_msg("No packet with matching timestamp in buffer\n");
-				}
-				pkt_del(last);
-			}
-
-			break;
 		}
 	}
 
-retr:
 	retransmit_packets();
 
 	/* If the window isn't full and we still have data to read,
@@ -200,7 +201,7 @@ retr:
 		if (len == 0) {
 			log_msg("Reached EOF\n");
 			reached_eof = true;
-			continue;
+			return;
 		}
 
 		pkt_t *pkt = pkt_new();
