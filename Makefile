@@ -19,13 +19,14 @@ default: SRCS += src/util.c
 default: SRCS += src/window.c
 default: sender receiver
 
-tests: LDFLAGS += -lcunit
+tests: IFLAGS += -ICUnit-2.1-3/include 
+tests: LDFLAGS += CUnit-2.1-3/lib/libcunit.a
 tests: SRCS += src/packet_implem.c
 tests: SRCS += src/window.c
 tests: SRCS += tests/main.c
 tests:
 	@rm -f test
-	$(CC) -o test $(SRCS) $(CFLAGS) $(LDFLAGS)
+	$(CC) -o test $(IFLAGS) $(SRCS) $(CFLAGS) $(LDFLAGS)
 	valgrind --leak-check=full --show-leak-kinds=all ./test
 
 sender: SRCS += src/sender.c
