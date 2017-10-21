@@ -2,7 +2,6 @@ CC = gcc
 CFLAGS += -g
 CFLAGS += -std=gnu99
 CFLAGS += -O1
-CFLAGS += -Wfatal-errors # Stop on the first error, otherwise gets overwhelming
 CFLAGS += -Werror
 CFLAGS += -Wall
 CFLAGS += -Wextra
@@ -19,7 +18,7 @@ default: SRCS += src/util.c
 default: SRCS += src/window.c
 default: sender receiver
 
-tests: IFLAGS += -ICUnit-2.1-3/include 
+tests: IFLAGS += -ICUnit-2.1-3/include
 tests: LDFLAGS += CUnit-2.1-3/lib/libcunit.a
 tests: SRCS += src/packet_implem.c
 tests: SRCS += src/window.c
