@@ -181,6 +181,8 @@ void main_loop(void) {
 				break;
 			}
 		}
+
+		pkt_del(resp);
 	}
 
 	retransmit_packets();
@@ -273,6 +275,7 @@ int main(int argc, char **argv) {
 	}
 
 	window_free(w);
+	fclose(infile);
 
 	return 0;
 }

@@ -219,6 +219,7 @@ int main(int argc, char **argv) {
 	}
 
 	window_free(w);
+	fclose(outfile);
 
 	return 0;
 }
