@@ -5,7 +5,7 @@
 
 struct window {
 	// Example: ... 3 [0 1] 2 ... (capacity=4, size=2, pos=0)
-	size_t capacity; // maximum size
+	size_t capacity; // maximum size (= max seqnum + 1)
 	size_t size; // current size
 	size_t pos;
 
@@ -41,6 +41,10 @@ void window_free(window_t *w) {
 		cur = next;
 	}
 	free(w);
+}
+
+size_t window_start(window_t *w) {
+	return w->pos;
 }
 
 void window_slide(window_t *w) {
@@ -88,6 +92,14 @@ int window_push(window_t *w, pkt_t *pkt) {
 	w->bufsize++;
 
 	return 0;
+}
+
+size_t window_available(window_t *w) {
+	/* We may have shrunk the window below the buffer size */
+	if (w->size < w->bufsize) {
+		return 0;
+	}
+	return w->size - w->bufsize;
 }
 
 size_t window_buffer_size(window_t *w) {

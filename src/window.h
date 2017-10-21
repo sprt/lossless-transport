@@ -23,6 +23,12 @@ window_t *window_create(size_t size, size_t max_size);
 void window_free(window_t *w);
 
 /**
+ * Returns the first sequence number in the window.
+ * Example: calling with 3 0 [1 2] returns 1.
+ */
+size_t window_start(window_t *w);
+
+/**
  * Slide the window by one unit without touching the internal buffer.
  * Example: 3 0 [1 2] becomes 3] 0 1 [2.
  */
@@ -49,6 +55,11 @@ size_t window_get_size(window_t *w);
  * Returns -1 on error or if the window is full, and 0 otherwise.
  */
 int window_push(window_t *w, pkt_t *pkt);
+
+/**
+ * Returns the number of free slots in the buffer.
+ */
+size_t window_available(window_t *w);
 
 /**
  * Returns the number of packets in the buffer.

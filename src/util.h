@@ -37,6 +37,13 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
                   struct sockaddr_in6 *dest_addr, int dst_port);
 
 /**
+ * Sends a packet over the specified socket.
+ * Calls send and returns its value. If the packet could not be encoded,
+ * it prints on stderr and exits.
+ */
+int send_packet(int sockfd, pkt_t *pkt);
+
+/**
  * Returns the amount of time (in microseconds) elapsed since an arbitrary point
  * in time, in a STRICTLY monotonic fashion, with the first call returning 0.
  *

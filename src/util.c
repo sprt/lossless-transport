@@ -9,6 +9,8 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "packet_interface.h"
+
 void log_msg(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
@@ -113,6 +115,15 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port,
 	}
 
 	return sockfd;
+}
+
+int send_packet(int sockfd, pkt_t *pkt) {
+	char buf[MAX_PACKET_SIZE];
+	size_t len = MAX_PACKET_SIZE;
+	if (pkt_encode(pkt, buf, &len) != PKT_OK) {
+		exit_msg("Error encoding packet: %d\n");
+	}
+	return send(sockfd, buf, len, 0);
 }
 
 uint32_t get_monotime(void) {

@@ -39,19 +39,6 @@ uint32_t get_timeout(void) {
 }
 
 /**
- * Sends a packet over the specified socket. Calls send and returns its value.
- * Exits if the packet couldn't be encoded.
- */
-int send_packet(pkt_t *pkt) {
-	char buf[MAX_PACKET_SIZE];
-	size_t len = MAX_PACKET_SIZE;
-	if (pkt_encode(pkt, buf, &len) != PKT_OK) {
-		exit_msg("Error encoding packet: %d\n");
-	}
-	return send(sockfd, buf, len, 0);
-}
-
-/**
  * Resend each packet for which the retransmission timer has expired.
  * Exits on error.
  */
@@ -68,7 +55,7 @@ void retransmit_packets(void) {
 			exit_msg("Cannot update timestamp of packet\n");
 		}
 		/* Resend it now */
-		if (send_packet(delayed_pkt) == -1) {
+		if (send_packet(sockfd, delayed_pkt) == -1) {
 			exit_perror("send");
 		}
 		/* The packet was in the buffer already so nothing else to do */
@@ -132,6 +119,7 @@ void read_write_loop(void) {
 			if (pkt == NULL) {
 				exit_msg("Error creating packet\n");
 			}
+
 			pkt_status_code err = PKT_OK;
 			err = err || pkt_set_type(pkt, PTYPE_DATA);
 			err = err || pkt_set_seqnum(pkt, 10);
@@ -140,7 +128,11 @@ void read_write_loop(void) {
 			err = err || pkt_set_timestamp(pkt, get_monotime() + TIMER);
 			err = err || pkt_set_payload(pkt, buf, len);
 
-			if (send_packet(pkt) == -1) {
+			if (err != PKT_OK) {
+				exit_msg("Could not create packet: %d\n", err);
+			}
+
+			if (send_packet(sockfd, pkt) == -1) {
 				exit_perror("send");
 			}
 

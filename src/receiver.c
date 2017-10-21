@@ -51,18 +51,12 @@ void main_loop(void) {
 	FD_SET(sockfd, &read_fds);
 
 	log_msg("Waiting for a packet\n");
-
 	if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
 		exit_perror("select");
 	}
 
 	/* If this is reached, select returned and we know we have a packet
 	 * since read_fds only contains one file descriptor. */
-
-	// if (window_full(w)) {
-	// 	log_msg("Window full, discarding\n");
-	// 	return;
-	// }
 
 	/* Read the datagram received into a buffer */
 	char buf[MAX_PACKET_SIZE];
@@ -73,10 +67,7 @@ void main_loop(void) {
 
 	/* Decode the datagram into a packet */
 	pkt_t *pkt = pkt_new();
-	if (pkt == NULL) {
-		exit_msg("Could not allocate packet\n");
-	}
-	if (pkt_decode(buf, len, pkt) != PKT_OK) {
+	if (pkt_decode(buf, len, pkt) != PKT_OK) { /* guards from pkt being NULL */
 		log_msg("Error decoding packet (%d), ignoring", pkt_decode);
 		return;
 	}
@@ -84,6 +75,88 @@ void main_loop(void) {
 	log_msg("Seqnum=%03d, TR=%d, Length=%03d, Timestamp=%010d\n",
 		pkt_get_seqnum(pkt), pkt_get_tr(pkt), pkt_get_length(pkt),
 		pkt_get_timestamp(pkt));
+
+	if (!window_has(w, pkt_get_seqnum(pkt))) {
+		log_msg("Out of window, discarding");
+		return;
+	}
+
+	/* We're gonna send a (N)ACK so let's allocate a new packet to reply */
+	pkt_t *reply = pkt_new();
+	if (reply == NULL) {
+		exit_msg("Could not allocate reply packet\n");
+	}
+
+	if (pkt_get_tr(pkt)) {
+		/* Send a NACK if we receive a truncated packet */
+		pkt_status_code err = PKT_OK;
+		err = err || pkt_set_type(reply, PTYPE_NACK);
+		/* We don't store truncated packets so the window size doesn't change */
+		err = err || pkt_set_window(reply, window_available(w));
+		err = err || pkt_set_seqnum(reply, pkt_get_seqnum(pkt));
+
+		if (err != PKT_OK) {
+			exit_msg("Could not create packet: %d\n", err);
+		}
+
+		if (send_packet(sockfd, reply) == -1) {
+			exit_perror("Could not send NACK: send:");
+		}
+	} else {
+		/* We're gonna send an ACK, but first we store the received
+		 * packet in the buffer, and then we try to write out packets to
+		 * the file, so that we can reply with an accurate window size. */
+
+		if (window_push(w, pkt) == -1) {
+			exit_msg("Could not add packet to buffer (full=%d)", window_full(w));
+		}
+
+		/* Write out the in-sequence packets that are at the beginning
+		 * of the window */
+		while (!window_empty(w)) {
+			/* If the sequence number of the first packet in the
+			 * buffer corresponds to the first sequence number in
+			 * the window, then the first packet in the buffer is
+			 * in-sequence, and we can write it out to the file. */
+			pkt_t *min_seqnum = window_peek_min_seqnum(w);
+			if (pkt_get_seqnum(min_seqnum) == window_start(w)) {
+				/* Now try to write the packet to the file.
+				 * Iff this succeeds, we can pop it from the
+				 * buffer and slide the window. */
+
+				char fbuf[MAX_PACKET_SIZE];
+				size_t flen = MAX_PACKET_SIZE;
+
+				pkt_status_code err = pkt_encode(min_seqnum, fbuf, &flen);
+				if (err != PKT_OK) {
+					exit_msg("Could not encode packet to store in fbuffer: %d", err);
+				}
+
+				if (fwrite(fbuf, sizeof (*fbuf), flen, outfile) < flen) {
+					exit_msg("Could not write to file\n");
+				}
+
+				window_pop_min_seqnum(w);
+				window_slide(w);
+			}
+		}
+
+		/* There's no duplication so we can just send an ACK */
+
+		pkt_status_code err = PKT_OK;
+		err = err || pkt_set_type(reply, PTYPE_ACK);
+		err = err || pkt_set_window(reply, window_available(w));
+		err = err || pkt_set_seqnum(reply, window_start(w));
+		err = err || pkt_set_timestamp(reply, pkt_get_timestamp(pkt));
+
+		if (err != PKT_OK) {
+			exit_msg("Could not create packet: %d\n", err);
+		}
+
+		if (send_packet(sockfd, reply) == -1) {
+			exit_perror("Could not send ACK: send:");
+		}
+	}
 }
 
 int main(int argc, char **argv) {
