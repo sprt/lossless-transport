@@ -16,7 +16,6 @@ char *filename; /* file we read data from */
 
 int sockfd = -1; /* socket we're operating on */
 FILE *infile; /* file we're reading data from */
-bool reached_eof = false; /* whether we're done reading from the file */
 window_t *w; /* sending window, buffer contains in-flight packets */
 size_t next = 0; /* sequence number of the next packet to be sent */
 
@@ -30,7 +29,7 @@ uint32_t get_timeout(void) {
 	 * timeout expires. If the window is full or if we've reached EOF on the
 	 * file, we can't write any more data right now and we should block,
 	 * albeit at *most* until the closest timer in the window expires. */
-	if (window_full(w) || reached_eof) {
+	if (window_full(w) || feof(infile)) {
 		uint32_t timer = pkt_get_timestamp(window_peek_min_timestamp(w));
 		uint32_t now = get_monotime();
 		/* select doesn't like negative timeouts, and we can't return
@@ -186,7 +185,7 @@ void main_loop(void) {
 
 	/* If the window isn't full and we still have data to read,
 	 * just keep filling up the buffer */
-	if (!window_full(w) && !reached_eof) {
+	if (!window_full(w) && !feof(infile)) {
 		char buf[MAX_PAYLOAD_SIZE] = {0};
 		size_t len = fread(buf, sizeof (*buf), MAX_PAYLOAD_SIZE, infile);
 
@@ -194,7 +193,6 @@ void main_loop(void) {
 			if (ferror(infile)) {
 				exit_msg("Error reading from file\n");
 			}
-			reached_eof = true;
 			log_msg("Reached EOF\n");
 		}
 
@@ -262,7 +260,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	while (!reached_eof || !window_empty(w)) {
+	while (!feof(infile) || !window_empty(w)) {
 		/* This is probably the line you're looking for */
 		main_loop();
 	}
