@@ -46,6 +46,11 @@ bool window_has(window_t *w, size_t seqnum);
 int window_resize(window_t *w, size_t new_size);
 
 /**
+ * Returns the maximum size set when the window was created.
+ */
+size_t window_get_max_size(window_t *w);
+
+/**
  * Returns the size of the window as set by window_create and window_resize.
  */
 size_t window_get_size(window_t *w);
@@ -77,16 +82,21 @@ bool window_empty(window_t *w);
 bool window_full(window_t *w);
 
 /**
+ * Returns a packet from the buffer with the specified sequence.
+ */
+pkt_t *window_find_seqnum(window_t *w, size_t seqnum);
+
+/**
  * Updates the timestamp of the packet which current timestamp is old_time to
  * new_time. Returns -1 if there is no such packet.
  */
 int window_update_timestamp(window_t *w, uint32_t old_time, uint32_t new_time);
 
-// /**
-//  * Returns the packet with the specified timestamp and removes it from the
-//  * buffer. Returns NULL if there is no such packet.
-//  */
-// pkt_t *window_pop_timestamp(window_t *w, uint32_t timestamp);
+/**
+ * Returns the packet with the specified timestamp and removes it from the
+ * buffer. Returns NULL if there is no such packet.
+ */
+pkt_t *window_pop_timestamp(window_t *w, uint32_t timestamp);
 
 /**
  * Returns the packet in the buffer with the minimum timestamp,
@@ -164,7 +174,7 @@ pkt_t *window_pop_min_seqnum(window_t *w);
  * next: seqnum of the next packet to be received (initial value: 0)
  * [0 1 (2) 3 4]
  *
- * Queue contains out of seq packets (and thus not yet sent)
+ * Queue contains out of seq packets (and thus not yet written to file)
  *
  * Enqueue
  * -------

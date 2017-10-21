@@ -65,6 +65,10 @@ int window_resize(window_t *w, size_t new_size) {
 	return 0;
 }
 
+size_t window_get_max_size(window_t *w) {
+	return w->capacity;
+}
+
 size_t window_get_size(window_t *w) {
 	return w->size;
 }
@@ -116,6 +120,18 @@ bool window_full(window_t *w) {
 	return (w->bufsize == w->capacity) || (w->bufsize >= w->size);
 }
 
+pkt_t *window_find_seqnum(window_t *w, size_t seqnum) {
+	struct node *cur = w->front;
+	while (cur != NULL) {
+		if (pkt_get_seqnum(cur->pkt) == seqnum) {
+			return cur->pkt;
+		}
+		cur = cur->next;
+	}
+	/* Reached only if there's no match */
+	return NULL;
+}
+
 int window_update_timestamp(window_t *w, uint32_t old_time, uint32_t new_time) {
 	struct node *cur = w->front;
 	while (cur != NULL) {
@@ -128,20 +144,6 @@ int window_update_timestamp(window_t *w, uint32_t old_time, uint32_t new_time) {
 	/* Reached only if there's no match */
 	return -1;
 }
-
-// // Unsure if needed
-// pkt_t *window_pop_timestamp(window_t *w, uint32_t timestamp) {
-// 	struct node *match = NULL;
-// 	struct node *cur = w->front;
-// 	while (cur != NULL) {
-// 		if (pkt_get_timestamp(cur->pkt) == timestamp) {
-// 			match = cur;
-// 			break;
-// 		}
-// 		cur = cur->next;
-// 	}
-// 	return window_pop_node(w, &match);
-// }
 
 /**
  * Removes the specified node from the buffer and returns the corresponding
@@ -169,6 +171,19 @@ pkt_t *window_pop_node(window_t *w, struct node **node) {
 
 	w->bufsize--;
 	return pkt;
+}
+
+pkt_t *window_pop_timestamp(window_t *w, uint32_t timestamp) {
+	struct node *match = NULL;
+	struct node *cur = w->front;
+	while (cur != NULL) {
+		if (pkt_get_timestamp(cur->pkt) == timestamp) {
+			match = cur;
+			break;
+		}
+		cur = cur->next;
+	}
+	return window_pop_node(w, &match);
 }
 
 struct node *window_find_min_timestamp(window_t *w) {

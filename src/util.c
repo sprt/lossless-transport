@@ -11,7 +11,17 @@
 
 #include "packet_interface.h"
 
+void print_time(void) {
+	struct timespec tp;
+	if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1) {
+		abort();
+	}
+	double secs = tp.tv_sec + ((double) tp.tv_nsec) / 1000000000;
+	fprintf(stderr, "[%7.3f] ", secs);
+}
+
 void log_msg(const char *fmt, ...) {
+	print_time();
 	va_list args;
 	va_start(args, fmt);
 	vfprintf(stderr, fmt, args);
@@ -19,10 +29,12 @@ void log_msg(const char *fmt, ...) {
 }
 
 void log_perror(const char *s) {
+	print_time();
 	perror(s);
 }
 
 void exit_msg(const char *fmt, ...) {
+	print_time();
 	va_list args;
 	va_start(args, fmt);
 	vfprintf(stderr, fmt, args);
@@ -31,12 +43,32 @@ void exit_msg(const char *fmt, ...) {
 }
 
 void exit_perror(const char *s) {
+	print_time();
 	exit_msg("%s: %s\n", s, strerror(errno));
 }
 
 void exit_usage(char **argv) {
 	fprintf(stderr, "Usage: %s <hostname> <port> [-f FILE]\n", argv[0]);
 	exit(2);
+}
+
+void log_pkt(pkt_t *pkt) {
+	if (pkt == NULL) {
+		log_msg("(nil)");
+		return;
+	}
+
+	char *type;
+	switch (pkt_get_type(pkt)) {
+		case PTYPE_ACK:  type = "ACK";     break;
+		case PTYPE_DATA: type = "DATA";    break;
+		case PTYPE_NACK: type = "NACK";    break;
+		default:         type = "UNKNOWN";
+	}
+
+	log_msg("<Type=%s, TR=%d, Win=%d, Seq=%d, Time=%d, Len=%d>\n",
+		type, pkt_get_tr(pkt), pkt_get_window(pkt), pkt_get_seqnum(pkt),
+		pkt_get_timestamp(pkt), pkt_get_length(pkt));
 }
 
 void parse_args(int argc, char **argv,

@@ -71,6 +71,11 @@ void log_msg(const char *fmt, ...);
 void log_perror(const char *s);
 
 /**
+ * Prints key information about a packet on stderr.
+ */
+void log_pkt(pkt_t *pkt);
+
+/**
  * Prints a message on stderr and exits with a non-zero code.
  */
 void exit_msg(const char *fmt, ...);

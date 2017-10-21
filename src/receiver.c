@@ -50,7 +50,8 @@ void main_loop(void) {
 	FD_ZERO(&read_fds);
 	FD_SET(sockfd, &read_fds);
 
-	log_msg("Waiting for a packet\n");
+	log_msg("---------- Waiting for a packet...\n");
+
 	if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
 		exit_perror("select");
 	}
@@ -72,12 +73,11 @@ void main_loop(void) {
 		return;
 	}
 
-	log_msg("Seqnum=%03d, TR=%d, Length=%03d, Timestamp=%010d\n",
-		pkt_get_seqnum(pkt), pkt_get_tr(pkt), pkt_get_length(pkt),
-		pkt_get_timestamp(pkt));
+	log_msg("Received packet:\n");
+	log_pkt(pkt);
 
 	if (!window_has(w, pkt_get_seqnum(pkt))) {
-		log_msg("Out of window, discarding");
+		log_msg("Out of window, discarding\n");
 		pkt_del(pkt);
 		return;
 	}
@@ -105,6 +105,9 @@ void main_loop(void) {
 		if (send_packet(sockfd, reply) == -1) {
 			exit_perror("Could not send NACK: send:");
 		}
+
+		log_msg("Sent NACK:\n");
+		log_pkt(reply);
 	} else {
 		/* We're gonna send an ACK, but first we store the received
 		 * packet in the buffer, and then we try to write out packets to
@@ -113,6 +116,10 @@ void main_loop(void) {
 		if (window_push(w, pkt) == -1) {
 			exit_msg("Could not add packet to buffer (full=%d)", window_full(w));
 		}
+
+		/* Save the timestamp of the packet we're acknowledging in case
+		 * it's immediately removed from the buffer and freed. */
+		uint32_t ack_timestamp = pkt_get_timestamp(pkt);
 
 		/* Write out the in-sequence packets that are at the beginning
 		 * of the window.
@@ -152,7 +159,7 @@ void main_loop(void) {
 		err = err || pkt_set_type(reply, PTYPE_ACK);
 		err = err || pkt_set_window(reply, window_available(w));
 		err = err || pkt_set_seqnum(reply, window_start(w));
-		err = err || pkt_set_timestamp(reply, pkt_get_timestamp(pkt));
+		err = err || pkt_set_timestamp(reply, ack_timestamp);
 
 		if (err != PKT_OK) {
 			exit_msg("Could not create packet: %d\n", err);
@@ -161,6 +168,9 @@ void main_loop(void) {
 		if (send_packet(sockfd, reply) == -1) {
 			exit_perror("Could not send ACK: send:");
 		}
+
+		log_msg("Sent ACK:\n");
+		log_pkt(reply);
 	}
 
 	pkt_del(reply);
