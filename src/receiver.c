@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "packet_interface.h"
 #include "util.h"
@@ -45,22 +44,10 @@ int wait_for_client(void) {
  * Called inside an infinite loop. Exits on error.
  */
 void main_loop(void) {
-	/* Initialize the set inside the loop as it is mutated by select */
-	fd_set read_fds;
-	FD_ZERO(&read_fds);
-	FD_SET(sockfd, &read_fds);
-
 	log_msg("---------- Waiting for a packet...\n");
 	log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
 		window_start(w), window_start(w) + (window_get_size(w) - 1),
 		window_buffer_size(w), window_get_size(w));
-
-	if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
-		exit_perror("select");
-	}
-
-	/* If this is reached, select returned and we know we have a packet
-	 * since read_fds only contains one file descriptor. */
 
 	/* Read the datagram received into a buffer */
 	char buf[MAX_PACKET_SIZE];
