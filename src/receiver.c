@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "packet_interface.h"
 #include "util.h"
@@ -12,7 +13,6 @@ char *filename; /* file on which we write out data */
 int sockfd = -1; /* socket we're listening on */
 FILE *outfile; /* file we're writing out the data to */
 window_t *w; /* receiving window, buffer contains out-of-sequence packets */
-bool reached_eof; /* whether we've received the empty packet that signals EOF */
 
 /**
  * Blocks until we receive the first packet and then establishes the
@@ -42,8 +42,7 @@ int wait_for_client(void) {
 }
 
 /**
- * Called inside a loop that terminates on (!reached_eof || !window_empty(w)).
- * Exits on error.
+ * Called inside an infinite loop. Exits on error.
  */
 void main_loop(void) {
 	/* Initialize the set inside the loop as it is mutated by select */
@@ -149,13 +148,17 @@ void main_loop(void) {
 			}
 
 			window_pop_min_seqnum(w);
-			window_slide(w);
 
 			/* We don't store truncated packets in the buffer so no
 			 * need to check for that */
 			if (pkt_get_length(min_seqnum) == 0) {
-				reached_eof = true;
-				log_msg("Received EOF packet\n");
+				log_msg("Received EOF packet, ready to quit\n");
+			} else {
+				/* Don't slide the window when we receive the
+				 * EOF packet. Rationale: the ACK may get lost
+				 * and when the sender retransmits the EOF packet,
+				 * it would fall outside our window. */
+				window_slide(w);
 			}
 
 			pkt_del(min_seqnum);
@@ -225,7 +228,7 @@ int main(int argc, char **argv) {
 
 	log_msg("Received first packet, connected\n");
 
-	while (!reached_eof || !window_empty(w)) {
+	while (true) {
 		/* This is probably the line you're looking for */
 		main_loop();
 	}
