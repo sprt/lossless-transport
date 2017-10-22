@@ -79,6 +79,10 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt) {
 	} else if (pkt_get_window(pkt) > MAX_WINDOW_SIZE) {
 		return E_WINDOW;
 	} else if (payload_size > MAX_PAYLOAD_SIZE) {
+		/* FIXME: pkt_get_length returns 0 when the packet has been
+		 * truncated, regardless of the value of length field. Thus, in
+		 * that case we can't reliably check whether the length field
+		 * overflows the maximum size given by the specification. */
 		return E_LENGTH;
 	} else if (len != pkt_get_total_size(pkt)) {
 		// Return now in order to prevent a potential buffer overflow

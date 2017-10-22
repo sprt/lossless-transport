@@ -78,7 +78,7 @@ void main_loop(void) {
 	log_pkt(pkt);
 
 	if (!window_has(w, pkt_get_seqnum(pkt))) {
-		log_msg("Out of window, discarding\n");
+		log_msg("Out of window, ignoring\n");
 		pkt_del(pkt);
 		return;
 	}
@@ -118,7 +118,7 @@ void main_loop(void) {
 			exit_msg("Could not add packet to buffer (full=%d)", window_full(w));
 		}
 
-		/* Save the timestamp of the packet we're acknowledging in case
+		/* Save the timestamp of the packet we just received in case
 		 * it's immediately removed from the buffer and freed. */
 		uint32_t ack_timestamp = pkt_get_timestamp(pkt);
 
@@ -131,9 +131,8 @@ void main_loop(void) {
 		 * write it out to the file. */
 		pkt_t *min_seqnum = window_peek_min_seqnum(w);
 		while (min_seqnum != NULL && pkt_get_seqnum(min_seqnum) == window_start(w)) {
-			/* Try to write the packet to the file. Iff this
-			 * succeeds, we can pop it from the buffer and slide the
-			 * window. */
+			/* Try to write the packet to the file. Iff this succeeds,
+			 * we can pop it from the buffer and slide the window. */
 
 			const char *payload = pkt_get_payload(min_seqnum);
 			size_t payload_len = pkt_get_length(min_seqnum);
@@ -145,7 +144,9 @@ void main_loop(void) {
 			window_pop_min_seqnum(w);
 			window_slide(w);
 
-			if (pkt_get_length(min_seqnum) == 0 && !pkt_get_tr(min_seqnum)) {
+			/* We don't store truncated packets in the buffer so no
+			 * need to check for that */
+			if (pkt_get_length(min_seqnum) == 0) {
 				reached_eof = true;
 				log_msg("Received EOF packet\n");
 			}

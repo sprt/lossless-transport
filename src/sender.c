@@ -81,7 +81,7 @@ void handle_ack(pkt_t *ack) {
 
 void handle_nack(pkt_t *nack) {
 	if (!window_has(w, pkt_get_seqnum(nack))) {
-		log_msg("Out of window, discarding\n");
+		log_msg("Out of window, ignoring\n");
 		return;
 	}
 
@@ -134,7 +134,7 @@ void main_loop(void) {
 	FD_ZERO(&read_fds);
 	FD_SET(sockfd, &read_fds);
 
-	/* Timeout will be zero unless the buffer is full or EOF was reached */
+	/* Timeout will be zero unless the buffer is full or EOF was sent */
 	uint32_t timeout_us = get_timeout();
 	struct timeval timeout_tv = micro_to_timeval(timeout_us);
 	log_msg("---------- Waiting for %.3fs...\n", (double) timeout_us / 1000000);
@@ -179,6 +179,8 @@ void main_loop(void) {
 				log_msg("NACK for #%d\n", pkt_get_seqnum(resp));
 				handle_nack(resp);
 				break;
+
+			/* other cases guarded by pkt_decode above */
 			}
 		}
 
@@ -242,6 +244,7 @@ void main_loop(void) {
 int main(int argc, char **argv) {
 	parse_args(argc, argv, &hostname, &port, &filename);
 
+	/* Initial window assumed to be 1, will be updated on ACKs */
 	w = window_create(1, MAX_WINDOW_SIZE);
 	if (w == NULL) {
 		exit_msg("window_create: Could not create window\n");
@@ -269,6 +272,9 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	/* If we haven't sent the EOF packet, we still have data to read.
+	 * If the window isn't empty, there are still unacknowledged packets
+	 * that we'll potentially have to resend. */
 	while (!sent_eof || !window_empty(w)) {
 		/* This is probably the line you're looking for */
 		main_loop();
