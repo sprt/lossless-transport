@@ -156,8 +156,10 @@ void main_loop(void) {
 			exit_msg("Could not allocate packet\n");
 		}
 
-		if (pkt_decode(buf, len, resp) != PKT_OK) {
-			log_msg("Error decoding packet: %d\n", resp);
+		pkt_status_code err = pkt_decode(buf, len, resp);
+
+		if (err != PKT_OK) {
+			log_msg("Error decoding packet: %d\n", err);
 		} else {
 			log_msg("< %s\n", pkt_repr(resp));
 
