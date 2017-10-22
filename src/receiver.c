@@ -73,8 +73,9 @@ void main_loop(void) {
 		exit_msg("Could not allocate packet\n");
 	}
 
-	if (pkt_decode(buf, len, pkt) != PKT_OK) {
-		log_msg("Error decoding packet (%d), ignoring", pkt_decode);
+	pkt_status_code decerr = pkt_decode(buf, len, pkt);
+	if (decerr != PKT_OK) {
+		log_msg("Error decoding packet (%s), ignoring\n", pkt_code_to_str(decerr));
 		return;
 	}
 
@@ -101,7 +102,8 @@ void main_loop(void) {
 		err = err || pkt_set_seqnum(reply, pkt_get_seqnum(pkt));
 
 		if (err != PKT_OK) {
-			exit_msg("Could not create packet: %d\n", err);
+			exit_msg("Could not create packet: %s\n",
+				pkt_code_to_str(err));
 		}
 
 		if (send_packet(sockfd, reply) == -1) {
@@ -165,7 +167,8 @@ void main_loop(void) {
 		err = err || pkt_set_timestamp(reply, ack_timestamp);
 
 		if (err != PKT_OK) {
-			exit_msg("Could not create packet: %d\n", err);
+			exit_msg("Could not create packet: %s\n",
+				pkt_code_to_str(err));
 		}
 
 		if (send_packet(sockfd, reply) == -1) {

@@ -83,6 +83,8 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt);
  */
 pkt_status_code pkt_encode(const pkt_t*, char *buf, size_t *len);
 
+char *pkt_code_to_str(pkt_status_code code);
+
 /* Accesseurs pour les champs toujours presents du paquet.
  * Les valeurs renvoyees sont toutes dans l'endianness native
  * de la machine!

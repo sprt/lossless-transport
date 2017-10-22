@@ -133,6 +133,22 @@ pkt_status_code pkt_encode(const pkt_t *pkt, char *buf, size_t *len) {
 	return PKT_OK;
 }
 
+char *pkt_code_to_str(pkt_status_code code) {
+	switch (code) {
+		case PKT_OK:         return "PKT_OK";
+		case E_TYPE:         return "E_TYPE";
+		case E_TR:           return "E_TR";
+		case E_LENGTH:       return "E_LENGTH";
+		case E_CRC:          return "E_CRC";
+		case E_WINDOW:       return "E_WINDOW";
+		case E_SEQNUM:       return "E_SEQNUM";
+		case E_NOMEM:        return "E_NOMEM";
+		case E_NOHEADER:     return "E_NOHEADER";
+		case E_UNCONSISTENT: return "E_UNCONSISTENT";
+		default:             return "UNKNOWN";
+	}
+}
+
 
 /*
  * Getters

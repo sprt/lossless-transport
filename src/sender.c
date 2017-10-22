@@ -117,7 +117,7 @@ void retransmit_packets(void) {
 
 		/* The packet was in the buffer already so nothing else to do */
 
-		log_msg("< (retr) %s\n", pkt_repr(pkt));
+		log_msg("> RETR %s\n", pkt_repr(pkt));
 		pkt = window_peek_min_timestamp(w);
 	}
 }
@@ -159,7 +159,8 @@ void main_loop(void) {
 		pkt_status_code err = pkt_decode(buf, len, resp);
 
 		if (err != PKT_OK) {
-			log_msg("Error decoding packet: %d\n", err);
+			log_msg("Error decoding packet (%s), ignoring\n",
+				pkt_code_to_str(err));
 		} else {
 			log_msg("< %s\n", pkt_repr(resp));
 
