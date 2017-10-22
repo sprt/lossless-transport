@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -59,12 +60,6 @@ void handle_ack(pkt_t *ack) {
 		}
 
 		window_slide(w);
-
-		/* Resize the sending window according to the receiving window
-		 * so as not to overload the receiver. */
-		size_t swin = window_get_size(w);
-		size_t rwin = pkt_get_window(ack);
-		window_resize(w, MIN(swin, rwin));
 
 		pkt_del(min_seqnum);
 		min_seqnum = window_peek_min_seqnum(w);
@@ -135,7 +130,11 @@ void main_loop(void) {
 	/* Timeout will be zero unless the buffer is full or EOF was sent */
 	uint32_t timeout_us = get_timeout();
 	struct timeval timeout_tv = micro_to_timeval(timeout_us);
+
 	log_msg("---------- Waiting for %.3fs...\n", (double) timeout_us / 1000000);
+	log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
+		window_start(w), window_start(w) + (window_get_size(w) - 1),
+		window_buffer_size(w), window_get_size(w));
 
 	/* Wait until either we receive data on the socket
 	 * or the timeout expires */
@@ -181,9 +180,22 @@ void main_loop(void) {
 
 			/* other cases guarded by pkt_decode above */
 			}
+
+			/* We handled an ACK or a NACK, so resize the sending
+			 * window according to the receiving window so as not to
+			 * overload the receiver. */
+			size_t swin = window_get_max_size(w);
+			size_t rwin = pkt_get_window(resp);
+			size_t new_win_size = MIN(swin, rwin);
+			assert(window_resize(w, new_win_size) == 0);
+			log_msg("New window size: %zu\n", new_win_size);
 		}
 
 		pkt_del(resp);
+
+		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
+			window_start(w), window_start(w) + (window_get_size(w) - 1),
+			window_buffer_size(w), window_get_size(w));
 	}
 
 	retransmit_packets();
