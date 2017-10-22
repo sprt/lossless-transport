@@ -79,6 +79,7 @@ void main_loop(void) {
 	pkt_status_code decerr = pkt_decode(buf, len, pkt);
 	if (decerr != PKT_OK) {
 		log_msg("Error decoding packet (%s), ignoring\n", pkt_code_to_str(decerr));
+		pkt_del(pkt);
 		return;
 	}
 
