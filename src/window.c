@@ -12,7 +12,6 @@ struct window {
 	// Buffer
 	size_t bufsize;
 	struct node *front;
-	struct node *rear;
 };
 
 struct node {
@@ -78,23 +77,16 @@ int window_push(window_t *w, pkt_t *pkt) {
 		return -1;
 	}
 
-	struct node *rear = calloc(1, sizeof (struct node));
-	if (rear == NULL) {
+	struct node *front = calloc(1, sizeof (struct node));
+	if (front == NULL) {
 		return -1;
 	}
 
-	if (w->front == NULL) {
-		/* Special case: buffer empty */
-		w->front = rear;
-		w->rear = rear;
-	} else {
-		w->rear->next = rear;
-		w->rear = rear;
-	}
+	front->pkt = pkt;
+	front->next = w->front;
+	w->front = front;
 
-	rear->pkt = pkt;
 	w->bufsize++;
-
 	return 0;
 }
 
@@ -155,15 +147,6 @@ pkt_t *window_pop_node(window_t *w, struct node **node) {
 	}
 
 	pkt_t *pkt = (*node)->pkt;
-
-	// Special case: exactly one element
-	if (w->front->next == NULL) {
-		free(w->front);
-		w->front = NULL;
-		w->rear = NULL;
-		w->bufsize = 0;
-		return pkt;
-	}
 
 	struct node *tmp = *node;
 	*node = (*node)->next;
