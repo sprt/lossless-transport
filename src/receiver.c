@@ -89,8 +89,6 @@ void main_loop(void) {
 	}
 
 	if (pkt_get_tr(pkt)) {
-		pkt_del(pkt);
-
 		/* Send a NACK if we receive a truncated packet */
 		pkt_status_code err = PKT_OK;
 		err = err || pkt_set_type(reply, PTYPE_NACK);
@@ -106,6 +104,7 @@ void main_loop(void) {
 			exit_perror("Could not send NACK: send:");
 		}
 
+		pkt_del(pkt);
 		log_msg("> %s\n", pkt_repr(reply));
 	} else {
 		/* We're gonna send an ACK, but first we store the received
