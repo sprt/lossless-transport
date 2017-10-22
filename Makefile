@@ -18,8 +18,8 @@ default: SRCS += src/util.c
 default: SRCS += src/window.c
 default: sender receiver
 
-tests: IFLAGS += -ICUnit-2.1-3/include
-tests: LDFLAGS += CUnit-2.1-3/lib/libcunit.a
+tests: IFLAGS += -Ilib/CUnit-2.1-3/include
+tests: LDFLAGS += lib/CUnit-2.1-3/lib/libcunit.a
 tests: SRCS += src/packet_implem.c
 tests: SRCS += src/window.c
 tests: SRCS += tests/main.c
