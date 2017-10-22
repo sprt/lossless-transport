@@ -151,7 +151,7 @@ uint8_t pkt_get_window(const pkt_t* pkt) {
 }
 
 uint8_t pkt_get_seqnum(const pkt_t* pkt) {
-	return (uint8_t) pkt->seqnum;
+	return pkt->seqnum;
 }
 
 uint16_t pkt_get_length(const pkt_t* pkt) {

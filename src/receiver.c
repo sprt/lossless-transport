@@ -69,7 +69,11 @@ void main_loop(void) {
 
 	/* Decode the datagram into a packet */
 	pkt_t *pkt = pkt_new();
-	if (pkt_decode(buf, len, pkt) != PKT_OK) { /* guards from pkt being NULL */
+	if (pkt == NULL) {
+		exit_msg("Could not allocate packet\n");
+	}
+
+	if (pkt_decode(buf, len, pkt) != PKT_OK) {
 		log_msg("Error decoding packet (%d), ignoring", pkt_decode);
 		return;
 	}
