@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS += -g
 CFLAGS += -std=gnu99
-CFLAGS += -O1
+CFLAGS += -O0 # useful when using a debugger
 CFLAGS += -Werror
 CFLAGS += -Wall
 CFLAGS += -Wextra
