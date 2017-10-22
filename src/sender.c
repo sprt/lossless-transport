@@ -117,9 +117,7 @@ void retransmit_packets(void) {
 
 		/* The packet was in the buffer already so nothing else to do */
 
-		log_msg("Resent packet:\n");
-		log_pkt(pkt);
-
+		log_msg("< (retr) %s\n", pkt_repr(pkt));
 		pkt = window_peek_min_timestamp(w);
 	}
 }
@@ -147,8 +145,6 @@ void main_loop(void) {
 
 	/* Received an ACK or a NACK */
 	if (FD_ISSET(sockfd, &read_fds)) {
-		log_msg("Received packet:\n");
-
 		char buf[MAX_PACKET_SIZE];
 		int len = recv(sockfd, buf, MAX_PACKET_SIZE, 0);
 		if (len == -1) {
@@ -163,20 +159,20 @@ void main_loop(void) {
 		if (pkt_decode(buf, len, resp) != PKT_OK) {
 			log_msg("Error decoding packet: %d\n", resp);
 		} else {
-			log_pkt(resp);
+			log_msg("< %s\n", pkt_repr(resp));
 
 			switch (pkt_get_type(resp)) {
 			case PTYPE_DATA:
-				log_msg("DATA packet, ignoring\n");
+				log_msg("Received DATA packet, ignoring\n");
 				return;
 
 			case PTYPE_ACK:
-				log_msg("ACK for #%d\n", pkt_get_seqnum(resp) - 1);
+				log_msg("Received ACK for #%d\n", pkt_get_seqnum(resp) - 1);
 				handle_ack(resp);
 				break;
 
 			case PTYPE_NACK:
-				log_msg("NACK for #%d\n", pkt_get_seqnum(resp));
+				log_msg("Received NACK for #%d\n", pkt_get_seqnum(resp));
 				handle_nack(resp);
 				break;
 
@@ -199,7 +195,7 @@ void main_loop(void) {
 			if (ferror(infile)) {
 				exit_msg("Error reading from file\n");
 			}
-			log_msg("Reached EOF\n");
+			log_msg("Read EOF\n");
 		}
 
 		pkt_t *pkt = pkt_new();
@@ -231,8 +227,7 @@ void main_loop(void) {
 
 		next = (next + 1) % window_get_max_size(w);
 
-		log_msg("Sent packet:\n");
-		log_pkt(pkt);
+		log_msg("> %s\n", pkt_repr(pkt));
 
 		if (len == 0) {
 			log_msg("Sent EOF packet\n");
@@ -247,7 +242,7 @@ int main(int argc, char **argv) {
 	/* Initial window assumed to be 1, will be updated on ACKs */
 	w = window_create(1, MAX_WINDOW_SIZE);
 	if (w == NULL) {
-		exit_msg("window_create: Could not create window\n");
+		exit_msg("Could not create window\n");
 	}
 
 	struct sockaddr_in6 dst_addr;
@@ -260,7 +255,7 @@ int main(int argc, char **argv) {
 	 * address by default and to only receive from this address. */
 	sockfd = create_socket(NULL, -1, &dst_addr, port);
 	if (sockfd == -1) {
-		exit_msg("create_socket: Could not create socket\n");
+		exit_msg("Could not create socket\n");
 	}
 
 	if (filename == NULL) {

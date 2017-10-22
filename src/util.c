@@ -11,6 +11,8 @@
 
 #include "packet_interface.h"
 
+char pkt_fmt_buf[1024];
+
 void print_time(void) {
 	struct timespec tp;
 	if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1) {
@@ -52,10 +54,9 @@ void exit_usage(char **argv) {
 	exit(2);
 }
 
-void log_pkt(pkt_t *pkt) {
+char *pkt_repr(pkt_t *pkt) {
 	if (pkt == NULL) {
-		log_msg("(nil)");
-		return;
+		return "(nil)";
 	}
 
 	char *type;
@@ -66,9 +67,14 @@ void log_pkt(pkt_t *pkt) {
 		default:         type = "UNKNOWN";
 	}
 
-	log_msg("<Type=%s, TR=%d, Win=%d, Seq=%d, Time=%d, Len=%d>\n",
+	int len = sprintf(pkt_fmt_buf, "{Type=%s, TR=%d, Win=%d, Seq=%d, Time=%d, Len=%d}",
 		type, pkt_get_tr(pkt), pkt_get_window(pkt), pkt_get_seqnum(pkt),
 		pkt_get_timestamp(pkt), pkt_get_length(pkt));
+	if (len < 0) {
+		abort();
+	}
+
+	return pkt_fmt_buf;
 }
 
 void parse_args(int argc, char **argv,

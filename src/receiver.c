@@ -74,8 +74,7 @@ void main_loop(void) {
 		return;
 	}
 
-	log_msg("Received packet:\n");
-	log_pkt(pkt);
+	log_msg("< %s\n", pkt_repr(pkt));
 
 	if (!window_has(w, pkt_get_seqnum(pkt))) {
 		log_msg("Out of window, ignoring\n");
@@ -107,8 +106,7 @@ void main_loop(void) {
 			exit_perror("Could not send NACK: send:");
 		}
 
-		log_msg("Sent NACK:\n");
-		log_pkt(reply);
+		log_msg("> %s\n", pkt_repr(reply));
 	} else {
 		/* We're gonna send an ACK, but first we store the received
 		 * packet in the buffer, and then we try to write out packets to
@@ -171,8 +169,7 @@ void main_loop(void) {
 			exit_perror("Could not send ACK: send:");
 		}
 
-		log_msg("Sent ACK:\n");
-		log_pkt(reply);
+		log_msg("> %s\n", pkt_repr(reply));
 	}
 
 	pkt_del(reply);
@@ -207,7 +204,7 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	log_msg("Waiting for sender\n");
+	log_msg("Waiting for sender...\n");
 	if (wait_for_client() == -1) {
 		exit_msg("Error waiting for sender\n");
 	}
