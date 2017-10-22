@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -151,6 +152,8 @@ void main_loop(void) {
 			pkt_del(min_seqnum);
 			min_seqnum = window_peek_min_seqnum(w);
 		}
+
+		assert(fflush(outfile) == 0);
 
 		/* There's no duplication so we can just send an ACK */
 
