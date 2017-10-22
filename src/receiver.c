@@ -52,6 +52,9 @@ void main_loop(void) {
 	FD_SET(sockfd, &read_fds);
 
 	log_msg("---------- Waiting for a packet...\n");
+	log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
+		window_start(w), window_start(w) + (window_get_size(w) - 1),
+		window_buffer_size(w), window_get_size(w));
 
 	if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
 		exit_perror("select");
@@ -176,6 +179,10 @@ void main_loop(void) {
 		}
 
 		log_msg("> %s\n", pkt_repr(reply));
+
+		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
+			window_start(w), window_start(w) + (window_get_size(w) - 1),
+			window_buffer_size(w), window_get_size(w));
 	}
 
 	pkt_del(reply);

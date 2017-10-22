@@ -174,64 +174,64 @@ pkt_t *window_pop_node(window_t *w, struct node **node) {
 }
 
 pkt_t *window_pop_timestamp(window_t *w, uint32_t timestamp) {
-	struct node *match = NULL;
-	struct node *cur = w->front;
-	while (cur != NULL) {
-		if (pkt_get_timestamp(cur->pkt) == timestamp) {
+	struct node **cur = &w->front;
+	struct node **match = cur;
+	while (*cur != NULL) {
+		if (pkt_get_timestamp((*cur)->pkt) == timestamp) {
 			match = cur;
 			break;
 		}
-		cur = cur->next;
+		cur = &(*cur)->next;
 	}
-	return window_pop_node(w, &match);
+	return window_pop_node(w, match);
 }
 
-struct node *window_find_min_timestamp(window_t *w) {
-	struct node *min = NULL;
-	struct node *cur = w->front;
-	while (cur != NULL) {
-		if (min == NULL || pkt_get_timestamp(cur->pkt) < pkt_get_timestamp(min->pkt)) {
+struct node **window_find_min_timestamp(window_t *w) {
+	struct node **cur = &w->front;
+	struct node **min = cur;
+	while (*cur != NULL) {
+		if (pkt_get_timestamp((*cur)->pkt) < pkt_get_timestamp((*min)->pkt)) {
 			min = cur;
 		}
-		cur = cur->next;
+		cur = &(*cur)->next;
 	}
 	return min;
 }
 
 pkt_t *window_peek_min_timestamp(window_t *w) {
-	struct node *min = window_find_min_timestamp(w);
-	if (min == NULL) {
+	struct node **min = window_find_min_timestamp(w);
+	if (*min == NULL) {
 		return NULL;
 	}
-	return min->pkt;
+	return (*min)->pkt;
 }
 
 pkt_t *window_pop_min_timestamp(window_t *w) {
-	struct node *min = window_find_min_timestamp(w);
-	return window_pop_node(w, &min);
+	struct node **min = window_find_min_timestamp(w);
+	return window_pop_node(w, min);
 }
 
-struct node *window_find_min_seqnum(window_t *w) {
-	struct node *min = NULL;
-	struct node *cur = w->front;
-	while (cur != NULL) {
-		if (min == NULL || pkt_get_seqnum(cur->pkt) < pkt_get_seqnum(min->pkt)) {
+struct node **window_find_min_seqnum(window_t *w) {
+	struct node **cur = &w->front;
+	struct node **min = cur;
+	while (*cur != NULL) {
+		if (pkt_get_seqnum((*cur)->pkt) < pkt_get_seqnum((*min)->pkt)) {
 			min = cur;
 		}
-		cur = cur->next;
+		cur = &(*cur)->next;
 	}
 	return min;
 }
 
 pkt_t *window_peek_min_seqnum(window_t *w) {
-	struct node *min = window_find_min_seqnum(w);
-	if (min == NULL) {
+	struct node **min = window_find_min_seqnum(w);
+	if (*min == NULL) {
 		return NULL;
 	}
-	return min->pkt;
+	return (*min)->pkt;
 }
 
 pkt_t *window_pop_min_seqnum(window_t *w) {
-	struct node *min = window_find_min_seqnum(w);
-	return window_pop_node(w, &min);
+	struct node **min = window_find_min_seqnum(w);
+	return window_pop_node(w, min);
 }
