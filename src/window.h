@@ -15,7 +15,7 @@ typedef struct window window_t;
  * Allocates a new window with the specified starting size and maximum size.
  * Returns NULL on error or if size > max_size.
  */
-window_t *window_create(size_t size, size_t max_size);
+window_t *window_create(size_t size, size_t max_size, size_t max_seqnum);
 
 /**
  * Free the resources allocated to the window only (i.e. NOT the packets).
@@ -29,10 +29,22 @@ void window_free(window_t *w);
 size_t window_start(window_t *w);
 
 /**
+ * Returns the last sequence number in the window.
+ * Example: calling with 3 0 [1 2] returns 2.
+ */
+size_t window_end(window_t *w);
+
+/**
  * Slide the window by one unit without touching the internal buffer.
  * Example: 3 0 [1 2] becomes 3] 0 1 [2.
  */
 void window_slide(window_t *w);
+
+/**
+ * Slide the window to the specified position.
+ * Example: sliding window 3 0 [1 2] to position 2 gives 3] 0 1 [2.
+ */
+void window_slide_to(window_t *w, size_t pos);
 
 /**
  * Reports whether the given sequence number is within the window.

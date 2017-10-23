@@ -46,9 +46,8 @@ int wait_for_client(void) {
  */
 void main_loop(void) {
 	log_msg("---------- Waiting for a packet...\n");
-	log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
-		window_start(w), window_start(w) + (window_get_size(w) - 1),
-		window_buffer_size(w), window_get_size(w));
+	log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n", window_start(w),
+		window_end(w), window_buffer_size(w), window_get_size(w));
 
 	/* Read the datagram received into a buffer */
 	char buf[MAX_PACKET_SIZE];
@@ -108,49 +107,58 @@ void main_loop(void) {
 		 * packet in the buffer, and then we try to write out packets to
 		 * the file, so that we can reply with an accurate window size. */
 
-		if (window_push(w, pkt) == -1) {
-			exit_msg("Could not add packet to buffer (full=%d)", window_full(w));
+		if (window_find_seqnum(w, pkt_get_seqnum(pkt)) != NULL) {
+			log_msg("Already in buffer\n");
+		} else {
+			if (window_push(w, pkt) == -1) {
+				if (window_full(w)) {
+					log_msg("Buffer full, not adding\n");
+					// pkt_del(pkt);
+					// pkt_del(reply);
+					// return;
+				} else {
+					exit_msg("Could not add packet to buffer\n");
+				}
+			} else {
+				log_msg("%d\n", pkt_get_seqnum(pkt));
+			}
 		}
 
 		/* Save the timestamp of the packet we just received in case
 		 * it's immediately removed from the buffer and freed. */
 		uint32_t ack_timestamp = pkt_get_timestamp(pkt);
 
-		/* Write out the in-sequence packets that are at the beginning
-		 * of the window.
-		 *
-		 * If the sequence number of the first packet in the buffer
-		 * corresponds to the first sequence number in the window, then
-		 * the first packet in the buffer is in-sequence, and we can
-		 * write it out to the file. */
-		pkt_t *min_seqnum = window_peek_min_seqnum(w);
-		while (min_seqnum != NULL && pkt_get_seqnum(min_seqnum) == window_start(w)) {
+		/* Find the next in-sequence packet. If it's not in the buffer,
+		 * we can't acknowledge any packet. */
+		pkt_t *next_pkt = window_find_seqnum(w, window_start(w));
+		while (next_pkt != NULL) {
 			/* Try to write the packet to the file. Iff this succeeds,
 			 * we can pop it from the buffer and slide the window. */
 
-			const char *payload = pkt_get_payload(min_seqnum);
-			size_t payload_len = pkt_get_length(min_seqnum);
+			const char *payload = pkt_get_payload(next_pkt);
+			size_t payload_len = pkt_get_length(next_pkt);
 
 			if (fwrite(payload, sizeof (*payload), payload_len, outfile) < payload_len) {
 				exit_msg("Error writing to file\n");
 			}
 
-			window_pop_min_seqnum(w);
+			log_msg("Wrote packet #%d\n", pkt_get_seqnum(next_pkt));
+			assert(window_pop_timestamp(w, pkt_get_timestamp(next_pkt)) == next_pkt);
 
 			/* We don't store truncated packets in the buffer so no
-			 * need to check for that */
-			if (pkt_get_length(min_seqnum) == 0) {
+			* need to check for that */
+			if (pkt_get_length(next_pkt) == 0) {
 				log_msg("Received EOF packet, ready to quit\n");
 			} else {
 				/* Don't slide the window when we receive the
-				 * EOF packet. Rationale: the ACK may get lost
-				 * and when the sender retransmits the EOF packet,
-				 * it would fall outside our window. */
+				* EOF packet. Rationale: the ACK may get lost
+				* and when the sender retransmits the EOF packet,
+				* it would fall outside our window. */
 				window_slide(w);
 			}
 
-			pkt_del(min_seqnum);
-			min_seqnum = window_peek_min_seqnum(w);
+			pkt_del(next_pkt);
+			next_pkt = window_find_seqnum(w, window_start(w));
 		}
 
 		assert(fflush(outfile) == 0);
@@ -174,9 +182,8 @@ void main_loop(void) {
 
 		log_msg("> %s\n", pkt_repr(reply));
 
-		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
-			window_start(w), window_start(w) + (window_get_size(w) - 1),
-			window_buffer_size(w), window_get_size(w));
+		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n", window_start(w),
+			window_end(w), window_buffer_size(w), window_get_size(w));
 	}
 
 	pkt_del(reply);
@@ -194,7 +201,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	w = window_create(MAX_WINDOW_SIZE, MAX_WINDOW_SIZE);
+	w = window_create(MAX_WINDOW_SIZE, MAX_WINDOW_SIZE, 255);
 	if (w == NULL) {
 		exit_msg("Could not create window\n");
 	}

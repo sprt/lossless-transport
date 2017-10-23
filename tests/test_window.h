@@ -36,6 +36,12 @@ void test_window_slide(void) {
 	CU_ASSERT_FALSE(window_has(w, 1));
 	CU_ASSERT_TRUE(window_has(w, 2));
 	CU_ASSERT_TRUE(window_has(w, 3));
+
+	window_slide(w); // [3 0] 1 2
+	CU_ASSERT_TRUE(window_has(w, 0));
+	CU_ASSERT_FALSE(window_has(w, 1));
+	CU_ASSERT_FALSE(window_has(w, 2));
+	CU_ASSERT_TRUE(window_has(w, 3));
 }
 
 void test_window_push(void) {

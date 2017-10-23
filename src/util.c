@@ -46,7 +46,8 @@ void exit_msg(const char *fmt, ...) {
 
 void exit_perror(const char *s) {
 	print_time();
-	exit_msg("%s: %s\n", s, strerror(errno));
+	fprintf(stderr, "%s: %s\n", s, strerror(errno));
+	exit(1);
 }
 
 void exit_usage(char **argv) {

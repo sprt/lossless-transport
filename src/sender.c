@@ -31,7 +31,7 @@ uint32_t get_timeout(void) {
 	 * timeout expires. If the window is full or if we've reached EOF on the
 	 * file, we can't write any more data right now and we should block,
 	 * albeit at *most* until the closest timer in the window expires. */
-	if (window_full(w) || sent_eof) {
+	if ((window_full(w) && !window_empty(w)) || sent_eof) {
 		uint32_t timer = pkt_get_timestamp(window_peek_min_timestamp(w));
 		uint32_t now = get_monotime();
 		/* select doesn't like negative timeouts, and we can't return
@@ -54,21 +54,26 @@ void handle_ack(pkt_t *ack) {
 	 * have a smaller sequence number. */
 	pkt_t *min_seqnum = window_peek_min_seqnum(w);
 	while (min_seqnum != NULL && pkt_get_seqnum(min_seqnum) < pkt_get_seqnum(ack)) {
-		window_pop_min_seqnum(w);
+		assert(window_pop_min_seqnum(w) == min_seqnum);
+		log_msg("Removed packet #%d from buffer\n", pkt_get_seqnum(min_seqnum));
+
 		if (pkt_get_timestamp(min_seqnum) == pkt_get_timestamp(ack)) {
 			popped_timestamp = true;
 		}
-
-		window_slide(w);
 
 		pkt_del(min_seqnum);
 		min_seqnum = window_peek_min_seqnum(w);
 	}
 
+	window_slide_to(w, pkt_get_seqnum(ack));
+
 	if (!popped_timestamp) {
 		pkt_t *last = window_pop_timestamp(w, pkt_get_timestamp(ack));
 		if (last == NULL) {
-			exit_msg("No packet with matching timestamp in buffer\n");
+			log_msg("No packet with matching timestamp in buffer\n");
+		} else {
+			log_msg("Acking packet #%d from timestamp field, removed from buffer\n",
+				pkt_get_seqnum(last));
 		}
 		pkt_del(last);
 	}
@@ -82,7 +87,8 @@ void handle_nack(pkt_t *nack) {
 
 	pkt_t *match = window_find_seqnum(w, pkt_get_seqnum(nack));
 	if (match == NULL) {
-		exit_msg("No packet with matching timestamp in buffer\n");
+		log_msg("No packet with matching seqnum in buffer\n");
+		return;
 	}
 
 	/* Set the timer of the corresponding packet to the current time
@@ -96,10 +102,13 @@ void handle_nack(pkt_t *nack) {
  * Exits on error.
  */
 void retransmit_packets(void) {
-	uint32_t now = get_monotime();
+	uint32_t loop_now = get_monotime();
 	pkt_t *pkt = window_peek_min_timestamp(w);
 
-	while (pkt != NULL && pkt_get_timestamp(pkt) <= now) {
+	while (pkt != NULL && pkt_get_timestamp(pkt) <= loop_now) {
+		/* Don't put this outside the loop! Would defeat its purpose. */
+		uint32_t now = get_monotime();
+
 		/* Reschedule the retransmission of the packet in case it fails again */
 		if (window_update_timestamp(w, pkt_get_timestamp(pkt), now + TIMER) == -1) {
 			exit_msg("Cannot update timestamp of packet\n");
@@ -127,19 +136,28 @@ void main_loop(void) {
 	FD_ZERO(&read_fds);
 	FD_SET(sockfd, &read_fds);
 
-	/* Timeout will be zero unless the buffer is full or EOF was sent */
-	uint32_t timeout_us = get_timeout();
-	struct timeval timeout_tv = micro_to_timeval(timeout_us);
+	if (!sent_eof && window_buffer_size(w) == 0 && window_get_size(w) == 0) {
+		log_msg("---------- Waiting indefinitely...\n");
+		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n", window_start(w),
+			window_end(w), window_buffer_size(w), window_get_size(w));
 
-	log_msg("---------- Waiting for %.3fs...\n", (double) timeout_us / 1000000);
-	log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
-		window_start(w), window_start(w) + (window_get_size(w) - 1),
-		window_buffer_size(w), window_get_size(w));
+		if (select(sockfd + 1, &read_fds, NULL, NULL, NULL) == -1) {
+			exit_perror("select");
+		}
+	} else {
+		/* Timeout will be zero unless the buffer is full or EOF was sent */
+		uint32_t timeout_us = get_timeout();
+		struct timeval timeout_tv = micro_to_timeval(timeout_us);
 
-	/* Wait until either we receive data on the socket
-	 * or the timeout expires */
-	if (select(sockfd + 1, &read_fds, NULL, NULL, &timeout_tv) == -1) {
-		exit_perror("select");
+		log_msg("---------- Waiting for %.3fs...\n", (double) timeout_us / 1000000);
+		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n", window_start(w),
+			window_end(w), window_buffer_size(w), window_get_size(w));
+
+		/* Wait until either we receive data on the socket
+		* or the timeout expires */
+		if (select(sockfd + 1, &read_fds, NULL, NULL, &timeout_tv) == -1) {
+			exit_perror("select");
+		}
 	}
 
 	/* Received an ACK or a NACK */
@@ -193,9 +211,8 @@ void main_loop(void) {
 
 		pkt_del(resp);
 
-		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n",
-			window_start(w), window_start(w) + (window_get_size(w) - 1),
-			window_buffer_size(w), window_get_size(w));
+		log_msg("Window: [%zu, %zu], buffer: %zu/%zu\n", window_start(w),
+			window_end(w), window_buffer_size(w), window_get_size(w));
 	}
 
 	retransmit_packets();
@@ -240,9 +257,10 @@ void main_loop(void) {
 			exit_msg("Could not add packet to buffer\n");
 		}
 
-		next = (next + 1) % window_get_max_size(w);
+		next = (next + 1) % 256;
 
 		log_msg("> %s\n", pkt_repr(pkt));
+		log_msg("Added packet #%d to buffer\n", pkt_get_seqnum(pkt));
 
 		if (len == 0) {
 			log_msg("Sent EOF packet\n");
@@ -255,7 +273,7 @@ int main(int argc, char **argv) {
 	parse_args(argc, argv, &hostname, &port, &filename);
 
 	/* Initial window assumed to be 1, will be updated on ACKs */
-	w = window_create(1, MAX_WINDOW_SIZE);
+	w = window_create(1, MAX_WINDOW_SIZE, 255);
 	if (w == NULL) {
 		exit_msg("Could not create window\n");
 	}
@@ -289,6 +307,8 @@ int main(int argc, char **argv) {
 		/* This is probably the line you're looking for */
 		main_loop();
 	}
+
+	log_msg("EOF acknowledged, quitting\n");
 
 	window_free(w);
 	fclose(infile);

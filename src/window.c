@@ -1,11 +1,13 @@
+#include <assert.h>
 #include <stdlib.h>
 
 #include "packet_interface.h"
 #include "window.h"
 
 struct window {
-	// Example: ... 3 [0 1] 2 ... (capacity=4, size=2, pos=0)
-	size_t capacity; // maximum size (= max seqnum + 1)
+	// Example: ... 3 [0 1] 2 ... (max_seqnum=4, size=2, pos=0)
+	size_t max_seqnum;
+	size_t capacity; // maximum size
 	size_t size; // current size
 	size_t pos;
 
@@ -19,7 +21,7 @@ struct node {
 	struct node *next;
 };
 
-window_t *window_create(size_t size, size_t max_size) {
+window_t *window_create(size_t size, size_t max_size, size_t max_seqnum) {
 	if (size > max_size) {
 		return NULL;
 	}
@@ -29,6 +31,7 @@ window_t *window_create(size_t size, size_t max_size) {
 	}
 	w->size = size;
 	w->capacity = max_size;
+	w->max_seqnum = max_seqnum; /* TODO: check valid */
 	return w;
 }
 
@@ -46,14 +49,27 @@ size_t window_start(window_t *w) {
 	return w->pos;
 }
 
+size_t window_end(window_t *w) {
+	return (w->pos + (w->size - 1)) % (w->max_seqnum + 1);
+}
+
 void window_slide(window_t *w) {
-	w->pos = (w->pos + 1) % w->capacity;
+	w->pos = (w->pos + 1) % (w->max_seqnum + 1);
+}
+
+void window_slide_to(window_t *w, size_t pos) {
+	assert(pos <= w->max_seqnum);
+	w->pos = pos;
 }
 
 bool window_has(window_t *w, size_t seqnum) {
-	size_t start = w->pos;
-	size_t end = start + ((w->size - 1) % w->capacity);
-	return (start <= seqnum) && (seqnum <= end);
+	if (w->size == 0) {
+		return false;
+	}
+	if (window_start(w) > window_end(w)) { /* Example: 3 [4 5 0 1] 2 */
+		return window_start(w) <= seqnum || seqnum <= window_end(w);
+	}
+	return window_start(w) <= seqnum && seqnum <= window_end(w);
 }
 
 int window_resize(window_t *w, size_t new_size) {
