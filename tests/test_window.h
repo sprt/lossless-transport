@@ -9,7 +9,7 @@
 window_t *w;
 
 void setup_window(void) {
-	w = window_create(2, 4); // 3 [0 1] 2
+	w = window_create(2, 4, 3); // 3 [0 1] 2
 }
 
 void teardown_window(void) {
